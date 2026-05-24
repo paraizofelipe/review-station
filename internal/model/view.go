@@ -19,6 +19,11 @@ func (m Model) View() string {
 	header := m.renderTitleBar()
 	statusbar := m.renderStatusbar()
 
+	if m.ShowFilter {
+		filterArea := m.renderFilterOverlay()
+		return header + "\n" + filterArea + statusbar
+	}
+
 	listContent := m.renderList()
 	m.Viewport.SetContent(listContent)
 
@@ -26,12 +31,7 @@ func (m Model) View() string {
 	sb.WriteString(header)
 	sb.WriteString("\n")
 	sb.WriteString(m.Viewport.View())
-	sb.WriteString("\n")
 	sb.WriteString(statusbar)
-
-	if m.ShowFilter {
-		return m.renderFilterOverlay()
-	}
 
 	return sb.String()
 }
@@ -137,7 +137,11 @@ func renderAge(t time.Time) string {
 		}
 		return fmt.Sprintf("há %d min", mins)
 	case d < 24*time.Hour:
-		return fmt.Sprintf("há %d horas", int(d.Hours()))
+		h := int(d.Hours())
+		if h == 1 {
+			return "há 1 hora"
+		}
+		return fmt.Sprintf("há %d horas", h)
 	default:
 		days := int(d.Hours() / 24)
 		if days == 1 {
@@ -178,7 +182,7 @@ func (m Model) renderFilterOverlay() string {
 	box := ui.StylePopoverBorder.Render(strings.TrimRight(inner.String(), "\n"))
 
 	return lipgloss.Place(
-		m.Width, m.Height,
+		m.Width, m.Viewport.Height,
 		lipgloss.Center, lipgloss.Center,
 		box,
 	)
