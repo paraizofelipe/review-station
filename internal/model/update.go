@@ -79,6 +79,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		for _, repo := range m.Config.Repos {
 			m.Loading[repo.Path] = true
+			delete(m.Errors, repo.Path)
 		}
 		m.Projects = nil
 		m.Items = nil
@@ -106,6 +107,7 @@ func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ShowFilter = false
 		for _, repo := range m.Config.Repos {
 			m.Loading[repo.Path] = true
+			delete(m.Errors, repo.Path)
 		}
 		m.Projects = nil
 		m.Items = nil
