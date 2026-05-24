@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -21,12 +22,11 @@ func NewClient(baseURL, token string) Client {
 	}
 }
 
-func (c Client) newRequest(method, url string) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, nil)
+func (c Client) newRequest(ctx context.Context, method, url string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	req.Header.Set("Content-Type", "application/json")
 	return req, nil
 }

@@ -1,6 +1,7 @@
 package gitlab_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +39,7 @@ func TestFetchMRs(t *testing.T) {
 	client := gitlab.NewClient(srv.URL, "test-token")
 	repo := config.Repo{Name: "repo", Path: "org/repo"}
 
-	mrs, err := client.FetchMRs(repo, "opened")
+	mrs, err := client.FetchMRs(context.Background(), repo, "opened")
 	if err != nil {
 		t.Fatalf("FetchMRs() error = %v", err)
 	}
@@ -57,6 +58,9 @@ func TestFetchMRs(t *testing.T) {
 	if mrs[0].SourceBranch != "feature/auth" {
 		t.Errorf("SourceBranch = %q", mrs[0].SourceBranch)
 	}
+	if mrs[0].CreatedAt.IsZero() {
+		t.Error("CreatedAt should not be zero")
+	}
 }
 
 func TestFetchMRsUnauthorized(t *testing.T) {
@@ -68,7 +72,7 @@ func TestFetchMRsUnauthorized(t *testing.T) {
 	client := gitlab.NewClient(srv.URL, "bad-token")
 	repo := config.Repo{Name: "repo", Path: "org/repo"}
 
-	_, err := client.FetchMRs(repo, "opened")
+	_, err := client.FetchMRs(context.Background(), repo, "opened")
 	if err == nil {
 		t.Error("FetchMRs() expected error for 401, got nil")
 	}

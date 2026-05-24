@@ -1,8 +1,10 @@
 package gitlab
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -39,12 +41,12 @@ type mrResponse struct {
 	State        string `json:"state"`
 }
 
-func (c Client) FetchMRs(repo config.Repo, state string) ([]MergeRequest, error) {
+func (c Client) FetchMRs(ctx context.Context, repo config.Repo, state string) ([]MergeRequest, error) {
 	encoded := url.PathEscape(repo.Path)
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests?state=%s&per_page=100",
-		c.BaseURL, encoded, state)
+		c.BaseURL, encoded, url.QueryEscape(state))
 
-	req, err := c.newRequest(http.MethodGet, apiURL)
+	req, err := c.newRequest(ctx, http.MethodGet, apiURL)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +58,7 @@ func (c Client) FetchMRs(repo config.Repo, state string) ([]MergeRequest, error)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("gitlab API returned %d for %s", resp.StatusCode, repo.Path)
 	}
 
