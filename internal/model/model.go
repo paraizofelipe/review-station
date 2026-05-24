@@ -131,3 +131,8 @@ func newViewport(w, h int) viewport.Model {
 	vp.Style = lipgloss.NewStyle().Background(ui.ColorBg)
 	return vp
 }
+
+// View is a placeholder until the view layer is implemented.
+func (m Model) View() string {
+	return ""
+}
