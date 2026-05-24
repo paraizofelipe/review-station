@@ -18,32 +18,41 @@ var (
 
 	StyleProjectHeader = lipgloss.NewStyle().
 				Foreground(ColorYellow).
+				Background(ColorBg).
 				Bold(true)
 
 	StyleCursor = lipgloss.NewStyle().
 			Foreground(ColorOrange).
+			Background(ColorBg).
 			Bold(true)
 
 	StyleMRNumber = lipgloss.NewStyle().
-			Foreground(ColorBlue)
+			Foreground(ColorBlue).
+			Background(ColorBg)
 
 	StyleAuthor = lipgloss.NewStyle().
-			Foreground(ColorGreen)
+			Foreground(ColorGreen).
+			Background(ColorBg)
 
 	StyleBranch = lipgloss.NewStyle().
-			Foreground(ColorPurple)
+			Foreground(ColorPurple).
+			Background(ColorBg)
 
 	StyleMeta = lipgloss.NewStyle().
-			Foreground(ColorGray)
+			Foreground(ColorGray).
+			Background(ColorBg)
 
 	StyleCIPassed = lipgloss.NewStyle().
-			Foreground(ColorGreen)
+			Foreground(ColorGreen).
+			Background(ColorBg)
 
 	StyleCIFailed = lipgloss.NewStyle().
-			Foreground(ColorRed)
+			Foreground(ColorRed).
+			Background(ColorBg)
 
 	StyleCINone = lipgloss.NewStyle().
-			Foreground(ColorGray)
+			Foreground(ColorGray).
+			Background(ColorBg)
 
 	StyleStatusBar = lipgloss.NewStyle().
 			Background(ColorStatusBg).
@@ -67,5 +76,6 @@ var (
 			Bold(true)
 
 	StyleError = lipgloss.NewStyle().
-			Foreground(ColorRed)
+			Foreground(ColorRed).
+			Background(ColorBg)
 )

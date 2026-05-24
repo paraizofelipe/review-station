@@ -52,7 +52,8 @@ func (m Model) renderTitleBar() string {
 	if gap < 1 {
 		gap = 1
 	}
-	return title + strings.Repeat(" ", gap) + statusStr
+	row := title + strings.Repeat(" ", gap) + statusStr
+	return lipgloss.NewStyle().Background(ui.ColorBg).Width(m.Width).Render(row)
 }
 
 func (m Model) renderStatusbar() string {
