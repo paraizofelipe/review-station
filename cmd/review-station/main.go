@@ -9,7 +9,7 @@ import (
 
 type emptyModel struct{}
 
-func (m emptyModel) Init() tea.Cmd                           { return tea.Quit }
+func (m emptyModel) Init() tea.Cmd                           { return nil }
 func (m emptyModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
 func (m emptyModel) View() string                            { return "" }
 
