@@ -39,6 +39,9 @@ type mrResponse struct {
 	CreatedAt    string `json:"created_at"`
 	WebURL       string `json:"web_url"`
 	State        string `json:"state"`
+	HeadPipeline *struct {
+		Status string `json:"status"`
+	} `json:"head_pipeline"`
 }
 
 func (c Client) FetchMRs(ctx context.Context, repo config.Repo, state string) ([]MergeRequest, error) {
@@ -70,6 +73,10 @@ func (c Client) FetchMRs(ctx context.Context, repo config.Repo, state string) ([
 	mrs := make([]MergeRequest, 0, len(raw))
 	for _, r := range raw {
 		created, _ := time.Parse(time.RFC3339, r.CreatedAt)
+		var pipeline *PipelineStatus
+		if r.HeadPipeline != nil {
+			pipeline = &PipelineStatus{Status: r.HeadPipeline.Status}
+		}
 		mrs = append(mrs, MergeRequest{
 			IID:          r.IID,
 			Title:        r.Title,
@@ -77,6 +84,7 @@ func (c Client) FetchMRs(ctx context.Context, repo config.Repo, state string) ([
 			SourceBranch: r.SourceBranch,
 			TargetBranch: r.TargetBranch,
 			CreatedAt:    created,
+			Pipeline:     pipeline,
 			WebURL:       r.WebURL,
 			State:        r.State,
 		})

@@ -103,9 +103,10 @@ func (m Model) Init() tea.Cmd {
 
 func fetchMRsCmd(client gitlab.Client, repo config.Repo, state string) tea.Cmd {
 	return func() tea.Msg {
-		mrs, err := client.FetchMRs(context.Background(), repo, state)
+		ctx := context.Background()
+		mrs, err := client.FetchMRs(ctx, repo, state)
 		if err != nil {
-			mrs, err = gitlab.FetchMRsFallback(repo, state)
+			mrs, err = gitlab.FetchMRsFallback(ctx, repo, state)
 			if err != nil {
 				return FetchErrorMsg{Repo: repo, Err: err}
 			}

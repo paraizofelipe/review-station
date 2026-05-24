@@ -24,6 +24,7 @@ func TestFetchMRs(t *testing.T) {
 			"created_at":    now.Format(time.RFC3339),
 			"web_url":       "https://gitlab.com/org/repo/-/merge_requests/42",
 			"state":         "opened",
+			"head_pipeline": map[string]any{"status": "success"},
 		},
 	}
 
@@ -60,6 +61,11 @@ func TestFetchMRs(t *testing.T) {
 	}
 	if mrs[0].CreatedAt.IsZero() {
 		t.Error("CreatedAt should not be zero")
+	}
+	if mrs[0].Pipeline == nil {
+		t.Error("Pipeline should not be nil when head_pipeline is present")
+	} else if mrs[0].Pipeline.Status != "success" {
+		t.Errorf("Pipeline.Status = %q, want %q", mrs[0].Pipeline.Status, "success")
 	}
 }
 

@@ -1,6 +1,7 @@
 package gitlab_test
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 
@@ -13,7 +14,7 @@ func TestFetchMRsFallback_GlabNotFound(t *testing.T) {
 		t.Skip("glab disponível — teste só cobre caminho de erro sem glab")
 	}
 	repo := config.Repo{Name: "repo", Path: "org/repo"}
-	_, err := gitlab.FetchMRsFallback(repo, "opened")
+	_, err := gitlab.FetchMRsFallback(context.Background(), repo, "opened")
 	if err == nil {
 		t.Error("FetchMRsFallback() expected error when glab not found, got nil")
 	}

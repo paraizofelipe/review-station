@@ -2,6 +2,8 @@ package model
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"paraizofelipe/review-station/internal/config"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -38,6 +40,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !updated {
 			m.Projects = append(m.Projects, ProjectGroup{Repo: msg.Repo, MRs: msg.MRs})
 		}
+		m.Projects = sortProjectsByConfig(m.Projects, m.Config.Repos)
 		m.Items = RebuildItems(m.Projects)
 		return m, nil
 
@@ -62,14 +65,22 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "j", "down":
-		if m.Cursor < len(m.Items)-1 {
-			m.Cursor++
+		next := m.Cursor + 1
+		for next < len(m.Items) && m.Items[next].Kind == ItemHeader {
+			next++
+		}
+		if next < len(m.Items) {
+			m.Cursor = next
 			m.syncViewport()
 		}
 
 	case "k", "up":
-		if m.Cursor > 0 {
-			m.Cursor--
+		prev := m.Cursor - 1
+		for prev >= 0 && m.Items[prev].Kind == ItemHeader {
+			prev--
+		}
+		if prev >= 0 {
+			m.Cursor = prev
 			m.syncViewport()
 		}
 
@@ -119,6 +130,23 @@ func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func sortProjectsByConfig(projects []ProjectGroup, repos []config.Repo) []ProjectGroup {
+	order := make(map[string]int, len(repos))
+	for i, r := range repos {
+		order[r.Path] = i
+	}
+	sorted := make([]ProjectGroup, len(projects))
+	copy(sorted, projects)
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if order[sorted[i].Repo.Path] > order[sorted[j].Repo.Path] {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+	return sorted
 }
 
 func (m *Model) syncViewport() {

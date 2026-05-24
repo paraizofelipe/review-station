@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -22,13 +23,13 @@ type glabMRResponse struct {
 	State        string `json:"state"`
 }
 
-func FetchMRsFallback(repo config.Repo, state string) ([]MergeRequest, error) {
+func FetchMRsFallback(ctx context.Context, repo config.Repo, state string) ([]MergeRequest, error) {
 	glabPath, err := exec.LookPath("glab")
 	if err != nil {
 		return nil, fmt.Errorf("glab not found in PATH: %w", err)
 	}
 
-	out, err := exec.Command(glabPath,
+	out, err := exec.CommandContext(ctx, glabPath,
 		"mr", "list",
 		"--repo", repo.Path,
 		"--state", state,
