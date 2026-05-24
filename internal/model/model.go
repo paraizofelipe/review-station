@@ -132,7 +132,3 @@ func newViewport(w, h int) viewport.Model {
 	return vp
 }
 
-// View is a placeholder until the view layer is implemented.
-func (m Model) View() string {
-	return ""
-}
