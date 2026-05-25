@@ -71,8 +71,11 @@ type Model struct {
 	ActiveMR         *gitlab.MergeRequest
 	ActiveRepo       config.Repo
 	Discussions      []gitlab.Discussion
-	CommentsLoading  bool
-	CommentsError    error
+	CommentsLoading     bool
+	CommentsError       error
+	RenderedDiscussions string
+	fetchToken          int64
+	listScrollOffset    int
 }
 
 // Bubbletea messages
@@ -88,11 +91,13 @@ type FetchErrorMsg struct {
 }
 
 type DiscussionsLoadedMsg struct {
+	Token       int64
 	Discussions []gitlab.Discussion
 }
 
 type FetchDiscussionsErrorMsg struct {
-	Err error
+	Token int64
+	Err   error
 }
 
 func New(cfg config.Config, client gitlab.Client) Model {
@@ -136,17 +141,17 @@ func fetchMRsCmd(client gitlab.Client, repo config.Repo, state string) tea.Cmd {
 	}
 }
 
-func fetchDiscussionsCmd(client gitlab.Client, repo config.Repo, mrIID int) tea.Cmd {
+func fetchDiscussionsCmd(client gitlab.Client, repo config.Repo, mrIID int, token int64) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		discussions, err := client.FetchDiscussions(ctx, repo, mrIID)
 		if err != nil {
 			discussions, err = gitlab.FetchDiscussionsFallback(ctx, repo, mrIID)
 			if err != nil {
-				return FetchDiscussionsErrorMsg{Err: err}
+				return FetchDiscussionsErrorMsg{Token: token, Err: err}
 			}
 		}
-		return DiscussionsLoadedMsg{Discussions: discussions}
+		return DiscussionsLoadedMsg{Token: token, Discussions: discussions}
 	}
 }
 

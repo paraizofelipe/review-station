@@ -245,8 +245,14 @@ func (m Model) renderDiscussions() string {
 	if len(m.Discussions) == 0 {
 		return "\n  Nenhum comentário encontrado."
 	}
+	return m.RenderedDiscussions
+}
 
-	contentWidth := m.Width - 4
+func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string {
+	if len(discussions) == 0 {
+		return ""
+	}
+	contentWidth := width - 4
 	if contentWidth < 20 {
 		contentWidth = 20
 	}
@@ -260,7 +266,7 @@ func (m Model) renderDiscussions() string {
 
 	var userDiscussions []gitlab.Discussion
 	var systemNotes []gitlab.Note
-	for _, d := range m.Discussions {
+	for _, d := range discussions {
 		if len(d.Notes) > 0 && d.Notes[0].System {
 			systemNotes = append(systemNotes, d.Notes...)
 		} else {
@@ -269,16 +275,14 @@ func (m Model) renderDiscussions() string {
 	}
 
 	var sb strings.Builder
-
 	for i, d := range userDiscussions {
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(renderDiscussion(d, r, m.Width))
+		sb.WriteString(renderDiscussion(d, r, width))
 	}
-
 	if len(systemNotes) > 0 {
-		divLen := max(m.Width-26, 4)
+		divLen := max(width-26, 4)
 		sb.WriteString(ui.StyleSectionDivider.Render(
 			"\n── Atividade do sistema " + strings.Repeat("─", divLen) + "\n",
 		))
@@ -286,7 +290,6 @@ func (m Model) renderDiscussions() string {
 			sb.WriteString(renderSystemNote(n))
 		}
 	}
-
 	return sb.String()
 }
 

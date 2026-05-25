@@ -25,6 +25,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Viewport.Width = m.Width
 			m.Viewport.Height = vpHeight
 		}
+		if m.Screen == ScreenComments && len(m.Discussions) > 0 {
+			m.RenderedDiscussions = buildRenderedDiscussions(m.Discussions, m.Width)
+		}
 		return m, nil
 
 	case MRsLoadedMsg:
@@ -50,11 +53,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case DiscussionsLoadedMsg:
+		if msg.Token != m.fetchToken {
+			return m, nil
+		}
 		m.CommentsLoading = false
 		m.Discussions = msg.Discussions
+		m.RenderedDiscussions = buildRenderedDiscussions(m.Discussions, m.Width)
 		return m, nil
 
 	case FetchDiscussionsErrorMsg:
+		if msg.Token != m.fetchToken {
+			return m, nil
+		}
 		m.CommentsLoading = false
 		m.CommentsError = msg.Err
 		return m, nil
@@ -100,14 +110,17 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.Cursor >= 0 && m.Cursor < len(m.Items) && m.Items[m.Cursor].Kind == ItemMR {
 			item := m.Items[m.Cursor]
+			m.fetchToken++
 			m.Screen = ScreenComments
 			m.ActiveMR = item.MR
 			m.ActiveRepo = item.Repo
 			m.Discussions = nil
 			m.CommentsLoading = true
 			m.CommentsError = nil
+			m.RenderedDiscussions = ""
+			m.listScrollOffset = m.Viewport.YOffset
 			m.Viewport.YOffset = 0
-			return m, fetchDiscussionsCmd(m.Client, item.Repo, item.MR.IID)
+			return m, fetchDiscussionsCmd(m.Client, item.Repo, item.MR.IID, m.fetchToken)
 		}
 
 	case "f":
@@ -162,7 +175,7 @@ func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "backspace", "esc":
 		m.Screen = ScreenList
-		m.Viewport.YOffset = 0
+		m.Viewport.YOffset = m.listScrollOffset
 		return m, nil
 	case "q", "ctrl+c":
 		return m, tea.Quit
