@@ -28,6 +28,13 @@ const (
 	ItemMR
 )
 
+type Screen int
+
+const (
+	ScreenList     Screen = iota
+	ScreenComments
+)
+
 type ListItem struct {
 	Kind    ListItemKind
 	Project *ProjectGroup
@@ -46,20 +53,26 @@ type FilterMenu struct {
 }
 
 type Model struct {
-	Config     config.Config
-	Client     gitlab.Client
-	Projects   []ProjectGroup
-	Loading    map[string]bool
-	Errors     map[string]error
-	Cursor     int
-	Items      []ListItem
-	Filter     FilterState
-	ShowFilter bool
-	FilterMenu FilterMenu
-	Viewport   viewport.Model
-	Width      int
-	Height     int
-	Ready      bool
+	Config           config.Config
+	Client           gitlab.Client
+	Projects         []ProjectGroup
+	Loading          map[string]bool
+	Errors           map[string]error
+	Cursor           int
+	Items            []ListItem
+	Filter           FilterState
+	ShowFilter       bool
+	FilterMenu       FilterMenu
+	Viewport         viewport.Model
+	Width            int
+	Height           int
+	Ready            bool
+	Screen           Screen
+	ActiveMR         *gitlab.MergeRequest
+	ActiveRepo       config.Repo
+	Discussions      []gitlab.Discussion
+	CommentsLoading  bool
+	CommentsError    error
 }
 
 // Bubbletea messages
@@ -72,6 +85,14 @@ type MRsLoadedMsg struct {
 type FetchErrorMsg struct {
 	Repo config.Repo
 	Err  error
+}
+
+type DiscussionsLoadedMsg struct {
+	Discussions []gitlab.Discussion
+}
+
+type FetchDiscussionsErrorMsg struct {
+	Err error
 }
 
 func New(cfg config.Config, client gitlab.Client) Model {
@@ -112,6 +133,20 @@ func fetchMRsCmd(client gitlab.Client, repo config.Repo, state string) tea.Cmd {
 			}
 		}
 		return MRsLoadedMsg{Repo: repo, MRs: mrs}
+	}
+}
+
+func fetchDiscussionsCmd(client gitlab.Client, repo config.Repo, mrIID int) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		discussions, err := client.FetchDiscussions(ctx, repo, mrIID)
+		if err != nil {
+			discussions, err = gitlab.FetchDiscussionsFallback(ctx, repo, mrIID)
+			if err != nil {
+				return FetchDiscussionsErrorMsg{Err: err}
+			}
+		}
+		return DiscussionsLoadedMsg{Discussions: discussions}
 	}
 }
 
