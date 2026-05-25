@@ -75,6 +75,36 @@ var (
 			Foreground(ColorOrange).
 			Bold(true)
 
+	StyleCommentAuthor = lipgloss.NewStyle().
+				Foreground(ColorBlue).
+				Background(ColorBg).
+				Bold(true)
+
+	StyleReplyAuthor = lipgloss.NewStyle().
+				Foreground(ColorPurple).
+				Background(ColorBg)
+
+	StyleReplyArrow = lipgloss.NewStyle().
+				Foreground(ColorGray).
+				Background(ColorBg)
+
+	StyleCommentDivider = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#504945")).
+				Background(ColorBg)
+
+	StyleSystemNote = lipgloss.NewStyle().
+				Foreground(ColorGray).
+				Background(ColorBg).
+				Italic(true)
+
+	StyleSectionDivider = lipgloss.NewStyle().
+				Foreground(ColorGray).
+				Background(ColorBg)
+
+	StyleResolvedBadge = lipgloss.NewStyle().
+				Foreground(ColorGreen).
+				Background(ColorBg)
+
 	StyleError = lipgloss.NewStyle().
 			Foreground(ColorRed).
 			Background(ColorBg)
