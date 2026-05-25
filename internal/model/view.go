@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"paraizofelipe/review-station/internal/gitlab"
@@ -14,6 +15,10 @@ import (
 func (m Model) View() string {
 	if !m.Ready {
 		return "inicializando..."
+	}
+
+	if m.Screen == ScreenComments {
+		return m.renderCommentsView()
 	}
 
 	header := m.renderTitleBar()
@@ -187,6 +192,155 @@ func (m Model) renderFilterOverlay() string {
 		lipgloss.Center, lipgloss.Center,
 		box,
 	)
+}
+
+func (m Model) renderCommentsView() string {
+	header := m.renderCommentsHeader()
+	statusbar := m.renderCommentsStatusbar()
+	content := m.renderDiscussions()
+	m.Viewport.SetContent(content)
+	var sb strings.Builder
+	sb.WriteString(header)
+	sb.WriteString("\n")
+	sb.WriteString(m.Viewport.View())
+	sb.WriteString(statusbar)
+	return sb.String()
+}
+
+func (m Model) renderCommentsHeader() string {
+	right := ui.StyleMeta.Render("← backspace voltar")
+	raw := "review-station · comentários"
+	if m.ActiveMR != nil {
+		raw = fmt.Sprintf("!%d  %s", m.ActiveMR.IID, m.ActiveMR.Title)
+	}
+	maxLeft := m.Width - lipgloss.Width(right) - 2
+	if maxLeft < 1 {
+		maxLeft = 1
+	}
+	if len([]rune(raw)) > maxLeft {
+		raw = string([]rune(raw)[:maxLeft-1]) + "…"
+	}
+	left := ui.StyleTitleBar.Render(raw)
+	gap := m.Width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
+	}
+	row := left + strings.Repeat(" ", gap) + right
+	return lipgloss.NewStyle().Background(ui.ColorBg).Width(m.Width).Render(row)
+}
+
+func (m Model) renderCommentsStatusbar() string {
+	return ui.StyleStatusBar.Width(m.Width).Render(
+		"j/k scroll  ctrl+d/u página  backspace voltar  q sair",
+	)
+}
+
+func (m Model) renderDiscussions() string {
+	if m.CommentsLoading {
+		return "\n  Carregando comentários..."
+	}
+	if m.CommentsError != nil {
+		return "\n  " + ui.StyleError.Render("Erro: "+m.CommentsError.Error())
+	}
+	if len(m.Discussions) == 0 {
+		return "\n  Nenhum comentário encontrado."
+	}
+
+	contentWidth := m.Width - 4
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(contentWidth),
+	)
+	if err != nil {
+		r = nil
+	}
+
+	var userDiscussions []gitlab.Discussion
+	var systemNotes []gitlab.Note
+	for _, d := range m.Discussions {
+		if len(d.Notes) > 0 && d.Notes[0].System {
+			systemNotes = append(systemNotes, d.Notes...)
+		} else {
+			userDiscussions = append(userDiscussions, d)
+		}
+	}
+
+	var sb strings.Builder
+
+	for i, d := range userDiscussions {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(renderDiscussion(d, r, m.Width))
+	}
+
+	if len(systemNotes) > 0 {
+		divLen := max(m.Width-26, 4)
+		sb.WriteString(ui.StyleSectionDivider.Render(
+			"\n── Atividade do sistema " + strings.Repeat("─", divLen) + "\n",
+		))
+		for _, n := range systemNotes {
+			sb.WriteString(renderSystemNote(n))
+		}
+	}
+
+	return sb.String()
+}
+
+func renderDiscussion(d gitlab.Discussion, r *glamour.TermRenderer, width int) string {
+	var sb strings.Builder
+	isFirst := true
+	for _, note := range d.Notes {
+		if note.System {
+			continue
+		}
+		if isFirst {
+			isFirst = false
+			header := ui.StyleCommentAuthor.Render("@"+note.Author) +
+				ui.StyleMeta.Render("  •  "+renderAge(note.CreatedAt))
+			if note.Resolvable && note.Resolved {
+				header += "  " + ui.StyleResolvedBadge.Render("[✓ resolvido]")
+			}
+			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", max(width-4, 4)))
+			body := renderMarkdown(r, note.Body)
+			sb.WriteString("  " + header + "\n")
+			sb.WriteString("  " + divider + "\n")
+			sb.WriteString(body)
+		} else {
+			header := ui.StyleReplyArrow.Render("    ↳ ") +
+				ui.StyleReplyAuthor.Render("@"+note.Author) +
+				ui.StyleMeta.Render("  •  "+renderAge(note.CreatedAt))
+			body := renderMarkdown(r, note.Body)
+			lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
+			var indented strings.Builder
+			for _, line := range lines {
+				indented.WriteString("    " + line + "\n")
+			}
+			sb.WriteString(header + "\n")
+			sb.WriteString(indented.String())
+		}
+	}
+	return sb.String()
+}
+
+func renderSystemNote(n gitlab.Note) string {
+	return ui.StyleSystemNote.Render(
+		fmt.Sprintf("⚙  @%s %s  •  %s", n.Author, n.Body, renderAge(n.CreatedAt)),
+	) + "\n"
+}
+
+func renderMarkdown(r *glamour.TermRenderer, body string) string {
+	if r == nil {
+		return body + "\n"
+	}
+	rendered, err := r.Render(body)
+	if err != nil {
+		return body + "\n"
+	}
+	return rendered
 }
 
 func (m Model) anyLoading() bool {
