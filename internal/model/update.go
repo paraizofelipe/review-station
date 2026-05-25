@@ -49,7 +49,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Errors[msg.Repo.Path] = msg.Err
 		return m, nil
 
+	case DiscussionsLoadedMsg:
+		m.CommentsLoading = false
+		m.Discussions = msg.Discussions
+		return m, nil
+
+	case FetchDiscussionsErrorMsg:
+		m.CommentsLoading = false
+		m.CommentsError = msg.Err
+		return m, nil
+
 	case tea.KeyMsg:
+		if m.Screen == ScreenComments {
+			return m.updateComments(msg)
+		}
 		if m.ShowFilter {
 			return m.updateFilter(msg)
 		}
@@ -82,6 +95,19 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if prev >= 0 {
 			m.Cursor = prev
 			m.syncViewport()
+		}
+
+	case "enter":
+		if m.Cursor >= 0 && m.Cursor < len(m.Items) && m.Items[m.Cursor].Kind == ItemMR {
+			item := m.Items[m.Cursor]
+			m.Screen = ScreenComments
+			m.ActiveMR = item.MR
+			m.ActiveRepo = item.Repo
+			m.Discussions = nil
+			m.CommentsLoading = true
+			m.CommentsError = nil
+			m.Viewport.YOffset = 0
+			return m, fetchDiscussionsCmd(m.Client, item.Repo, item.MR.IID)
 		}
 
 	case "f":
@@ -130,6 +156,20 @@ func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "backspace", "esc":
+		m.Screen = ScreenList
+		m.Viewport.YOffset = 0
+		return m, nil
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	}
+	var cmd tea.Cmd
+	m.Viewport, cmd = m.Viewport.Update(msg)
+	return m, cmd
 }
 
 func sortProjectsByConfig(projects []ProjectGroup, repos []config.Repo) []ProjectGroup {
