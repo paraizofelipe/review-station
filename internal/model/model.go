@@ -5,11 +5,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"paraizofelipe/review-station/internal/config"
 	"paraizofelipe/review-station/internal/gitlab"
-	"paraizofelipe/review-station/internal/ui"
 )
 
 type FilterState string
@@ -168,8 +166,6 @@ func RebuildItems(projects []ProjectGroup) []ListItem {
 }
 
 func newViewport(w, h int) viewport.Model {
-	vp := viewport.New(w, h)
-	vp.Style = lipgloss.NewStyle().Background(ui.ColorBg)
-	return vp
+	return viewport.New(w, h)
 }
 

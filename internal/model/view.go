@@ -58,7 +58,7 @@ func (m Model) renderTitleBar() string {
 		gap = 1
 	}
 	row := title + strings.Repeat(" ", gap) + statusStr
-	return lipgloss.NewStyle().Background(ui.ColorBg).Width(m.Width).Render(row)
+	return lipgloss.NewStyle().Width(m.Width).Render(row)
 }
 
 func (m Model) renderStatusbar() string {
@@ -93,13 +93,19 @@ func (m Model) renderList() string {
 }
 
 func renderProjectHeader(item ListItem) string {
-	count := len(item.Project.MRs)
-	noun := "MRs abertos"
-	if count == 1 {
-		noun = "MR aberto"
+	parts := strings.Split(item.Repo.Path, "/")
+	label := item.Repo.Path
+	if len(parts) > 2 {
+		label = strings.Join(parts[len(parts)-2:], "/")
 	}
-	text := fmt.Sprintf("▶ %s  (%d %s)", item.Repo.Path, count, noun)
-	return "\n" + ui.StyleProjectHeader.Render(text)
+	count := len(item.Project.MRs)
+	noun := "MRs"
+	if count == 1 {
+		noun = "MR"
+	}
+	labelStyled := ui.StyleProjectHeader.Render(fmt.Sprintf("%s (%d %s)", label, count, noun))
+	dashes := ui.StyleSectionDivider.Render(strings.Repeat("─", 15))
+	return "\n" + dashes + " " + labelStyled + " " + dashes
 }
 
 func renderMRRow(item ListItem, selected bool, width int) string {
@@ -226,7 +232,7 @@ func (m Model) renderCommentsHeader() string {
 		gap = 1
 	}
 	row := left + strings.Repeat(" ", gap) + right
-	return lipgloss.NewStyle().Background(ui.ColorBg).Width(m.Width).Render(row)
+	return lipgloss.NewStyle().Width(m.Width).Render(row)
 }
 
 func (m Model) renderCommentsStatusbar() string {

@@ -206,11 +206,18 @@ func (m *Model) syncViewport() {
 	if !m.Ready {
 		return
 	}
-	lineHeight := 3
-	cursorLine := m.Cursor * lineHeight
-	if cursorLine < m.Viewport.YOffset {
-		m.Viewport.YOffset = cursorLine
-	} else if cursorLine >= m.Viewport.YOffset+m.Viewport.Height {
-		m.Viewport.YOffset = cursorLine - m.Viewport.Height + lineHeight
+	const lineHeight = 2
+	cursorStart := m.Cursor * lineHeight
+	cursorEnd := cursorStart + lineHeight
+
+	scrollTop := cursorStart
+	if m.Cursor > 0 && m.Items[m.Cursor-1].Kind == ItemHeader {
+		scrollTop = (m.Cursor - 1) * lineHeight
+	}
+
+	if scrollTop < m.Viewport.YOffset {
+		m.Viewport.YOffset = scrollTop
+	} else if cursorEnd > m.Viewport.YOffset+m.Viewport.Height {
+		m.Viewport.YOffset = cursorEnd - m.Viewport.Height
 	}
 }

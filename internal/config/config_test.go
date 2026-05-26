@@ -49,3 +49,51 @@ func TestLoadMissingFile(t *testing.T) {
 		t.Error("Load() expected error for missing file, got nil")
 	}
 }
+
+func TestLoadExpandsEnvVars(t *testing.T) {
+	t.Setenv("RS_TEST_TOKEN", "glpat-from-env")
+	t.Setenv("RS_TEST_HOST", "gitlab.internal")
+	t.Setenv("RS_TEST_HOME", "/home/tester")
+
+	dir := t.TempDir()
+	content := `
+[gitlab]
+base_url = "https://${RS_TEST_HOST}"
+token = "${RS_TEST_TOKEN}"
+
+[[repo]]
+name = "app"
+path = "org/app"
+local = "${RS_TEST_HOME}/projects/app"
+
+[[repo]]
+name = "missing-var"
+path = "org/${RS_TEST_UNSET}"
+local = "literal-$RS_TEST_HOME"
+`
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got, want := cfg.GitLab.BaseURL, "https://gitlab.internal"; got != want {
+		t.Errorf("BaseURL = %q, want %q", got, want)
+	}
+	if got, want := cfg.GitLab.Token, "glpat-from-env"; got != want {
+		t.Errorf("Token = %q, want %q", got, want)
+	}
+	if got, want := cfg.Repos[0].Local, "/home/tester/projects/app"; got != want {
+		t.Errorf("Repos[0].Local = %q, want %q", got, want)
+	}
+	if got, want := cfg.Repos[1].Path, "org/"; got != want {
+		t.Errorf("Repos[1].Path = %q, want %q (env var ausente deve virar string vazia)", got, want)
+	}
+	if got, want := cfg.Repos[1].Local, "literal-$RS_TEST_HOME"; got != want {
+		t.Errorf("Repos[1].Local = %q, want %q ($VAR sem chaves deve permanecer literal)", got, want)
+	}
+}

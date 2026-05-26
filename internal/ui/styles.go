@@ -3,60 +3,48 @@ package ui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	ColorBg       = lipgloss.Color("#282828")
-	ColorFg       = lipgloss.Color("#ebdbb2")
-	ColorYellow   = lipgloss.Color("#d79921")
-	ColorOrange   = lipgloss.Color("#fe8019")
-	ColorBlue     = lipgloss.Color("#83a598")
-	ColorGreen    = lipgloss.Color("#b8bb26")
-	ColorPurple   = lipgloss.Color("#d3869b")
-	ColorGray     = lipgloss.Color("#928374")
-	ColorRed      = lipgloss.Color("#cc241d")
-	ColorStatusBg = lipgloss.Color("#3c3836")
-	ColorStatusFg = lipgloss.Color("#a89984")
-	ColorBorder   = lipgloss.Color("#504945")
+	ColorFg     = lipgloss.Color("#ebdbb2")
+	ColorYellow = lipgloss.Color("#d79921")
+	ColorOrange = lipgloss.Color("#fe8019")
+	ColorBlue   = lipgloss.Color("#83a598")
+	ColorGreen  = lipgloss.Color("#b8bb26")
+	ColorPurple = lipgloss.Color("#d3869b")
+	ColorGray   = lipgloss.Color("#928374")
+	ColorRed    = lipgloss.Color("#cc241d")
+	ColorMuted  = lipgloss.Color("#a89984")
+	ColorBorder = lipgloss.Color("#504945")
 
 	StyleProjectHeader = lipgloss.NewStyle().
 				Foreground(ColorYellow).
-				Background(ColorBg).
 				Bold(true)
 
 	StyleCursor = lipgloss.NewStyle().
 			Foreground(ColorOrange).
-			Background(ColorBg).
 			Bold(true)
 
 	StyleMRNumber = lipgloss.NewStyle().
-			Foreground(ColorBlue).
-			Background(ColorBg)
+			Foreground(ColorBlue)
 
 	StyleAuthor = lipgloss.NewStyle().
-			Foreground(ColorGreen).
-			Background(ColorBg)
+			Foreground(ColorGreen)
 
 	StyleBranch = lipgloss.NewStyle().
-			Foreground(ColorPurple).
-			Background(ColorBg)
+			Foreground(ColorPurple)
 
 	StyleMeta = lipgloss.NewStyle().
-			Foreground(ColorGray).
-			Background(ColorBg)
+			Foreground(ColorGray)
 
 	StyleCIPassed = lipgloss.NewStyle().
-			Foreground(ColorGreen).
-			Background(ColorBg)
+			Foreground(ColorGreen)
 
 	StyleCIFailed = lipgloss.NewStyle().
-			Foreground(ColorRed).
-			Background(ColorBg)
+			Foreground(ColorRed)
 
 	StyleCINone = lipgloss.NewStyle().
-			Foreground(ColorGray).
-			Background(ColorBg)
+			Foreground(ColorGray)
 
 	StyleStatusBar = lipgloss.NewStyle().
-			Background(ColorStatusBg).
-			Foreground(ColorStatusFg).
+			Foreground(ColorMuted).
 			Padding(0, 1)
 
 	StylePopoverBorder = lipgloss.NewStyle().
@@ -77,35 +65,27 @@ var (
 
 	StyleCommentAuthor = lipgloss.NewStyle().
 				Foreground(ColorBlue).
-				Background(ColorBg).
 				Bold(true)
 
 	StyleReplyAuthor = lipgloss.NewStyle().
-				Foreground(ColorPurple).
-				Background(ColorBg)
+				Foreground(ColorPurple)
 
 	StyleReplyArrow = lipgloss.NewStyle().
-				Foreground(ColorGray).
-				Background(ColorBg)
+			Foreground(ColorGray)
 
 	StyleCommentDivider = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#504945")).
-				Background(ColorBg)
+				Foreground(ColorBorder)
 
 	StyleSystemNote = lipgloss.NewStyle().
-				Foreground(ColorGray).
-				Background(ColorBg).
-				Italic(true)
+			Foreground(ColorGray).
+			Italic(true)
 
 	StyleSectionDivider = lipgloss.NewStyle().
-				Foreground(ColorGray).
-				Background(ColorBg)
+				Foreground(ColorGray)
 
 	StyleResolvedBadge = lipgloss.NewStyle().
-				Foreground(ColorGreen).
-				Background(ColorBg)
+				Foreground(ColorGreen)
 
 	StyleError = lipgloss.NewStyle().
-			Foreground(ColorRed).
-			Background(ColorBg)
+			Foreground(ColorRed)
 )
