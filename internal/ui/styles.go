@@ -134,4 +134,17 @@ var (
 
 	StyleError = lipgloss.NewStyle().
 			Foreground(ColorRed)
+
+	StyleDiffPath = lipgloss.NewStyle().
+			Foreground(ColorMuted).
+			Italic(true)
+
+	StyleDiffAdded = lipgloss.NewStyle().
+			Foreground(ColorGreen)
+
+	StyleDiffRemoved = lipgloss.NewStyle().
+			Foreground(ColorRed)
+
+	StyleDiffContextLine = lipgloss.NewStyle().
+				Foreground(ColorGray)
 )

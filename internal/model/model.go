@@ -69,8 +69,10 @@ type Model struct {
 	ActiveMR         *gitlab.MergeRequest
 	ActiveRepo       config.Repo
 	Discussions      []gitlab.Discussion
-	CommentsLoading     bool
-	CommentsError       error
+	Diffs            []gitlab.FileDiff
+	CommentsLoading  bool
+	CommentsError    error
+	DiffsLoading     bool
 	RenderedDiscussions string
 	fetchToken          int64
 	listScrollOffset    int
@@ -94,6 +96,16 @@ type DiscussionsLoadedMsg struct {
 }
 
 type FetchDiscussionsErrorMsg struct {
+	Token int64
+	Err   error
+}
+
+type DiffsLoadedMsg struct {
+	Token int64
+	Diffs []gitlab.FileDiff
+}
+
+type FetchDiffsErrorMsg struct {
 	Token int64
 	Err   error
 }
@@ -150,6 +162,20 @@ func fetchDiscussionsCmd(client gitlab.Client, repo config.Repo, mrIID int, toke
 			}
 		}
 		return DiscussionsLoadedMsg{Token: token, Discussions: discussions}
+	}
+}
+
+func fetchDiffsCmd(client gitlab.Client, repo config.Repo, mrIID int, token int64) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		diffs, err := client.FetchDiffs(ctx, repo, mrIID)
+		if err != nil {
+			diffs, err = gitlab.FetchDiffsFallback(ctx, repo, mrIID)
+			if err != nil {
+				return FetchDiffsErrorMsg{Token: token, Err: err}
+			}
+		}
+		return DiffsLoadedMsg{Token: token, Diffs: diffs}
 	}
 }
 

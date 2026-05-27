@@ -13,6 +13,14 @@ import (
 	"paraizofelipe/review-station/internal/config"
 )
 
+// Position descreve a localização no diff onde uma note inline foi criada.
+type Position struct {
+	NewPath string
+	OldPath string
+	NewLine int // 0 = não aplicável (linha removida)
+	OldLine int // 0 = não aplicável (linha adicionada)
+}
+
 type Note struct {
 	ID         int
 	Body       string
@@ -21,11 +29,19 @@ type Note struct {
 	System     bool
 	Resolvable bool
 	Resolved   bool
+	Position   *Position // nil = comentário geral, não-inline
 }
 
 type Discussion struct {
 	ID    string
 	Notes []Note
+}
+
+type positionResponse struct {
+	NewPath string `json:"new_path"`
+	OldPath string `json:"old_path"`
+	NewLine *int   `json:"new_line"`
+	OldLine *int   `json:"old_line"`
 }
 
 type noteResponse struct {
@@ -34,10 +50,11 @@ type noteResponse struct {
 	Author struct {
 		Username string `json:"username"`
 	} `json:"author"`
-	CreatedAt  string `json:"created_at"`
-	System     bool   `json:"system"`
-	Resolvable bool   `json:"resolvable"`
-	Resolved   bool   `json:"resolved"`
+	CreatedAt  string            `json:"created_at"`
+	System     bool              `json:"system"`
+	Resolvable bool              `json:"resolvable"`
+	Resolved   bool              `json:"resolved"`
+	Position   *positionResponse `json:"position"`
 }
 
 type discussionResponse struct {
@@ -102,6 +119,19 @@ func parseDiscussions(raw []discussionResponse) []Discussion {
 		notes := make([]Note, 0, len(d.Notes))
 		for _, n := range d.Notes {
 			created, _ := time.Parse(time.RFC3339, n.CreatedAt)
+			var pos *Position
+			if n.Position != nil && (n.Position.NewPath != "" || n.Position.OldPath != "") {
+				pos = &Position{
+					NewPath: n.Position.NewPath,
+					OldPath: n.Position.OldPath,
+				}
+				if n.Position.NewLine != nil {
+					pos.NewLine = *n.Position.NewLine
+				}
+				if n.Position.OldLine != nil {
+					pos.OldLine = *n.Position.OldLine
+				}
+			}
 			notes = append(notes, Note{
 				ID:         n.ID,
 				Body:       n.Body,
@@ -110,6 +140,7 @@ func parseDiscussions(raw []discussionResponse) []Discussion {
 				System:     n.System,
 				Resolvable: n.Resolvable,
 				Resolved:   n.Resolved,
+				Position:   pos,
 			})
 		}
 		discussions = append(discussions, Discussion{ID: d.ID, Notes: notes})

@@ -42,7 +42,7 @@ func TestBoxRenderDump(t *testing.T) {
 	}
 
 	width := 60
-	out := buildRenderedDiscussions(mr, discussions, width)
+	out := buildRenderedDiscussions(mr, discussions, nil, width)
 
 	// Dump legível (ANSI removido) para inspeção visual da estrutura.
 	t.Log("\n" + ansiRe.ReplaceAllString(out, ""))

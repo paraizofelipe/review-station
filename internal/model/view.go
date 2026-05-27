@@ -319,7 +319,7 @@ func newDescriptionRenderer(wrap int) *glamour.TermRenderer {
 	return r
 }
 
-func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, width int) string {
+func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, diffs []gitlab.FileDiff, width int) string {
 	parentContent := max(width-boxChrome, 16)
 	replyContent := max(width-replyIndent-boxChrome, 12)
 	descRenderer := newDescriptionRenderer(parentContent)
@@ -354,7 +354,7 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(renderDiscussion(d, parentRenderer, replyRenderer, parentContent, replyContent))
+		sb.WriteString(renderDiscussion(d, diffs, parentRenderer, replyRenderer, parentContent, replyContent))
 	}
 	if len(systemNotes) > 0 {
 		divLen := max(width-26, 4)
@@ -376,7 +376,7 @@ func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer, codeW
 	return "\n\n" + indentLines(content, 2) + "\n"
 }
 
-func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {
+func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {
 	var sb strings.Builder
 	isFirst := true
 	for _, note := range d.Notes {
@@ -393,7 +393,15 @@ func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamou
 			}
 			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
 			body := strings.Trim(renderMarkdownPadded(parentRenderer, note.Body, parentContent), "\n")
-			inner := header + "\n" + divider + "\n" + body
+
+			var inner string
+			if ctx := renderDiffContext(note.Position, diffs, parentContent); ctx != "" {
+				ctxDivider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
+				inner = ctx + "\n" + ctxDivider + "\n" + header + "\n" + divider + "\n" + body
+			} else {
+				inner = header + "\n" + divider + "\n" + body
+			}
+
 			box := ui.StyleCommentBox.Width(parentContent + 2).Render(inner)
 			sb.WriteString(box + "\n")
 		} else {
@@ -406,6 +414,68 @@ func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamou
 			sb.WriteString(indentLines(box, replyIndent) + "\n")
 		}
 	}
+	return sb.String()
+}
+
+// renderDiffContext retorna as linhas de diff relevantes para a posição de uma
+// note, ou string vazia se não houver contexto disponível.
+func renderDiffContext(pos *gitlab.Position, diffs []gitlab.FileDiff, width int) string {
+	if pos == nil || len(diffs) == 0 {
+		return ""
+	}
+
+	// Encontra o FileDiff correspondente ao arquivo comentado.
+	var fd *gitlab.FileDiff
+	for i := range diffs {
+		if diffs[i].NewPath == pos.NewPath || diffs[i].OldPath == pos.OldPath {
+			fd = &diffs[i]
+			break
+		}
+	}
+	if fd == nil {
+		return ""
+	}
+
+	lines := gitlab.ExtractDiffContext(fd.Diff, pos.NewLine, pos.OldLine, 3)
+	if len(lines) == 0 {
+		return ""
+	}
+
+	filePath := pos.NewPath
+	if filePath == "" {
+		filePath = pos.OldPath
+	}
+	targetLine := pos.NewLine
+	if targetLine == 0 {
+		targetLine = pos.OldLine
+	}
+
+	var sb strings.Builder
+	sb.WriteString(ui.StyleDiffPath.Render(fmt.Sprintf("· %s:%d", filePath, targetLine)))
+
+	maxContent := width - 2 // prefixo "+ " ou "  "
+	for _, l := range lines {
+		var prefix string
+		var style lipgloss.Style
+		switch l.Kind {
+		case gitlab.DiffLineKindAdded:
+			prefix = "+ "
+			style = ui.StyleDiffAdded
+		case gitlab.DiffLineKindRemoved:
+			prefix = "- "
+			style = ui.StyleDiffRemoved
+		default:
+			prefix = "  "
+			style = ui.StyleDiffContextLine
+		}
+		content := l.Content
+		if len([]rune(content)) > maxContent {
+			content = string([]rune(content)[:maxContent-1]) + "…"
+		}
+		sb.WriteString("\n")
+		sb.WriteString(style.Render(prefix + content))
+	}
+
 	return sb.String()
 }
 

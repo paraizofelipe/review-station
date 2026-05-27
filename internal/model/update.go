@@ -26,7 +26,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Viewport.Height = vpHeight
 		}
 		if m.Screen == ScreenComments && len(m.Discussions) > 0 {
-			m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Width)
+			m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width)
 			m.Viewport.SetContent(m.RenderedDiscussions)
 		}
 		return m, nil
@@ -59,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.CommentsLoading = false
 		m.Discussions = msg.Discussions
-		m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Width)
+		m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width)
 		m.Viewport.SetContent(m.RenderedDiscussions)
 		return m, nil
 
@@ -69,6 +69,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.CommentsLoading = false
 		m.CommentsError = msg.Err
+		return m, nil
+
+	case DiffsLoadedMsg:
+		if msg.Token != m.fetchToken {
+			return m, nil
+		}
+		m.DiffsLoading = false
+		m.Diffs = msg.Diffs
+		if !m.CommentsLoading && len(m.Discussions) > 0 {
+			m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width)
+			m.Viewport.SetContent(m.RenderedDiscussions)
+		}
+		return m, nil
+
+	case FetchDiffsErrorMsg:
+		if msg.Token != m.fetchToken {
+			return m, nil
+		}
+		m.DiffsLoading = false
+		// Diffs são opcionais: não bloqueia exibição dos comentários.
 		return m, nil
 
 	case tea.KeyMsg:
@@ -117,12 +137,17 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ActiveMR = item.MR
 			m.ActiveRepo = item.Repo
 			m.Discussions = nil
+			m.Diffs = nil
 			m.CommentsLoading = true
 			m.CommentsError = nil
+			m.DiffsLoading = true
 			m.RenderedDiscussions = ""
 			m.listScrollOffset = m.Viewport.YOffset
 			m.Viewport.YOffset = 0
-			return m, fetchDiscussionsCmd(m.Client, item.Repo, item.MR.IID, m.fetchToken)
+			return m, tea.Batch(
+				fetchDiscussionsCmd(m.Client, item.Repo, item.MR.IID, m.fetchToken),
+				fetchDiffsCmd(m.Client, item.Repo, item.MR.IID, m.fetchToken),
+			)
 		}
 
 	case "f":
