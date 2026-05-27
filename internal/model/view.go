@@ -322,7 +322,6 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 
 	if mr != nil && strings.TrimSpace(mr.Description) != "" {
 		sb.WriteString(renderMRDescription(mr, descRenderer))
-		sb.WriteString("\n")
 	}
 
 	var userDiscussions []gitlab.Discussion
@@ -333,6 +332,14 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 		} else {
 			userDiscussions = append(userDiscussions, d)
 		}
+	}
+
+	if len(userDiscussions) > 0 {
+		divLen := max(width-22, 4)
+		sb.WriteString(ui.StyleSectionDivider.Render(
+			"\n── Comentários " + strings.Repeat("─", divLen),
+		))
+		sb.WriteString("\n\n")
 	}
 
 	for i, d := range userDiscussions {
