@@ -417,14 +417,14 @@ func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRender
 	return sb.String()
 }
 
-// renderDiffContext retorna as linhas de diff relevantes para a posição de uma
-// note, ou string vazia se não houver contexto disponível.
+// renderDiffContext retorna o bloco de diff com syntax highlighting e
+// backgrounds coloridos (delta-style) para a posição de uma note inline,
+// ou string vazia se não houver contexto disponível.
 func renderDiffContext(pos *gitlab.Position, diffs []gitlab.FileDiff, width int) string {
 	if pos == nil || len(diffs) == 0 {
 		return ""
 	}
 
-	// Encontra o FileDiff correspondente ao arquivo comentado.
 	var fd *gitlab.FileDiff
 	for i := range diffs {
 		if diffs[i].NewPath == pos.NewPath || diffs[i].OldPath == pos.OldPath {
@@ -452,29 +452,8 @@ func renderDiffContext(pos *gitlab.Position, diffs []gitlab.FileDiff, width int)
 
 	var sb strings.Builder
 	sb.WriteString(ui.StyleDiffPath.Render(fmt.Sprintf("· %s:%d", filePath, targetLine)))
-
-	maxContent := width - 2 // prefixo "+ " ou "  "
-	for _, l := range lines {
-		var prefix string
-		var style lipgloss.Style
-		switch l.Kind {
-		case gitlab.DiffLineKindAdded:
-			prefix = "+ "
-			style = ui.StyleDiffAdded
-		case gitlab.DiffLineKindRemoved:
-			prefix = "- "
-			style = ui.StyleDiffRemoved
-		default:
-			prefix = "  "
-			style = ui.StyleDiffContextLine
-		}
-		content := l.Content
-		if len([]rune(content)) > maxContent {
-			content = string([]rune(content)[:maxContent-1]) + "…"
-		}
-		sb.WriteString("\n")
-		sb.WriteString(style.Render(prefix + content))
-	}
+	sb.WriteString("\n")
+	sb.WriteString(renderDiffBlock(lines, filePath, width))
 
 	return sb.String()
 }
