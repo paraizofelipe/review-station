@@ -2,10 +2,14 @@ package model
 
 import (
 	"fmt"
+	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
+	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
 
 	"paraizofelipe/review-station/internal/gitlab"
@@ -254,21 +258,82 @@ func (m Model) renderDiscussions() string {
 	return m.RenderedDiscussions
 }
 
+// replyIndent é o recuo (em colunas) das caixas de resposta em relação à
+// caixa do comentário pai.
+const replyIndent = 3
+
+// boxChrome é o espaço consumido pela borda (2) + padding horizontal (2) de
+// uma caixa lipgloss; usado para derivar a largura interna de conteúdo.
+const boxChrome = 4
+
+// commentGlamourStyle clona o estilo "dark" do glamour zerando a margem do
+// documento (a caixa já fornece o padding) e pintando o fundo do documento
+// com a cor de superfície, para que o fundo do terminal não vaze pelos resets
+// ANSI dentro da caixa.
+func commentGlamourStyle() ansi.StyleConfig {
+	cfg := styles.DarkStyleConfig
+	zero := uint(0)
+	bg := string(ui.ColorSurface)
+	cfg.Document.Margin = &zero
+	cfg.Document.StylePrimitive.BackgroundColor = &bg
+
+	// O code block é destacado pelo chroma (formatter terminal256): tokens sem
+	// BackgroundColor resetam para o fundo do terminal, vazando dentro da caixa.
+	// Pintamos TODOS os tokens com a cor da superfície para que o bloco use o
+	// mesmo fundo do texto normal — sem virar um retângulo de cor distinta,
+	// mantendo só o syntax highlighting nas cores do texto.
+	// O Chroma é um ponteiro compartilhado com o estilo global — copiamos antes
+	// de mutar.
+	if cfg.CodeBlock.Chroma != nil {
+		chromaCopy := *cfg.CodeBlock.Chroma
+		setChromaBackground(&chromaCopy, bg)
+		cfg.CodeBlock.Chroma = &chromaCopy
+	}
+	cfg.CodeBlock.StylePrimitive.BackgroundColor = &bg
+	// Código inline (`x`) também herda o fundo da superfície.
+	cfg.Code.StylePrimitive.BackgroundColor = &bg
+	return cfg
+}
+
+// setChromaBackground define BackgroundColor em todos os tokens StylePrimitive
+// do Chroma, garantindo que cada span emitido pelo chroma preencha o fundo.
+func setChromaBackground(c *ansi.Chroma, color string) {
+	v := reflect.ValueOf(c).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		bg := v.Field(i).FieldByName("BackgroundColor")
+		if bg.IsValid() && bg.CanSet() {
+			bg.Set(reflect.ValueOf(&color))
+		}
+	}
+}
+
+func newCommentRenderer(wrap int) *glamour.TermRenderer {
+	if wrap < 10 {
+		wrap = 10
+	}
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStyles(commentGlamourStyle()),
+		glamour.WithWordWrap(wrap),
+		// terminal16m = truecolor; sem isso o chroma usa terminal256 e quantiza
+		// o fundo do código para uma cor 256 levemente diferente da superfície
+		// (truecolor), criando um retângulo visível dentro da caixa.
+		glamour.WithChromaFormatter("terminal16m"),
+	)
+	if err != nil {
+		return nil
+	}
+	return r
+}
+
 func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string {
 	if len(discussions) == 0 {
 		return ""
 	}
-	contentWidth := width - 4
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
-	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
-		glamour.WithWordWrap(contentWidth),
-	)
-	if err != nil {
-		r = nil
-	}
+
+	parentContent := max(width-boxChrome, 16)
+	replyContent := max(width-replyIndent-boxChrome, 12)
+	parentRenderer := newCommentRenderer(parentContent)
+	replyRenderer := newCommentRenderer(replyContent)
 
 	var userDiscussions []gitlab.Discussion
 	var systemNotes []gitlab.Note
@@ -285,7 +350,7 @@ func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(renderDiscussion(d, r, width))
+		sb.WriteString(renderDiscussion(d, parentRenderer, replyRenderer, parentContent, replyContent))
 	}
 	if len(systemNotes) > 0 {
 		divLen := max(width-26, 4)
@@ -293,13 +358,13 @@ func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string
 			"\n── Atividade do sistema " + strings.Repeat("─", divLen) + "\n",
 		))
 		for _, n := range systemNotes {
-			sb.WriteString(renderSystemNote(n))
+			sb.WriteString(renderSystemNote(n, width))
 		}
 	}
 	return sb.String()
 }
 
-func renderDiscussion(d gitlab.Discussion, r *glamour.TermRenderer, width int) string {
+func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {
 	var sb strings.Builder
 	isFirst := true
 	for _, note := range d.Notes {
@@ -309,36 +374,122 @@ func renderDiscussion(d gitlab.Discussion, r *glamour.TermRenderer, width int) s
 		if isFirst {
 			isFirst = false
 			header := ui.StyleCommentAuthor.Render("@"+note.Author) +
-				ui.StyleMeta.Render("  •  "+renderAge(note.CreatedAt))
+				ui.StyleMetaOnSurface.Render("  •  "+renderAge(note.CreatedAt))
 			if note.Resolvable && note.Resolved {
-				header += "  " + ui.StyleResolvedBadge.Render("[✓ resolvido]")
+				header += ui.StyleMetaOnSurface.Render("  ") +
+					ui.StyleResolvedBadgeOnSurface.Render("[✓ resolvido]")
 			}
-			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", max(width-4, 4)))
-			body := renderMarkdown(r, note.Body)
-			sb.WriteString("  " + header + "\n")
-			sb.WriteString("  " + divider + "\n")
-			sb.WriteString(body)
+			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
+			body := strings.Trim(renderMarkdown(parentRenderer, note.Body), "\n")
+			inner := header + "\n" + divider + "\n" + body
+			box := ui.StyleCommentBox.Width(parentContent + 2).Render(inner)
+			sb.WriteString(box + "\n")
 		} else {
-			header := ui.StyleReplyArrow.Render("    ↳ ") +
+			header := ui.StyleReplyArrow.Render("↳ ") +
 				ui.StyleReplyAuthor.Render("@"+note.Author) +
-				ui.StyleMeta.Render("  •  "+renderAge(note.CreatedAt))
-			body := renderMarkdown(r, note.Body)
-			lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
-			var indented strings.Builder
-			for _, line := range lines {
-				indented.WriteString("    " + line + "\n")
-			}
-			sb.WriteString(header + "\n")
-			sb.WriteString(indented.String())
+				ui.StyleMetaOnSurface.Render("  •  "+renderAge(note.CreatedAt))
+			body := strings.Trim(renderMarkdown(replyRenderer, note.Body), "\n")
+			inner := header + "\n" + body
+			box := ui.StyleReplyBox.Width(replyContent + 2).Render(inner)
+			sb.WriteString(indentLines(box, replyIndent) + "\n")
 		}
 	}
 	return sb.String()
 }
 
-func renderSystemNote(n gitlab.Note) string {
-	return ui.StyleSystemNote.Render(
-		fmt.Sprintf("⚙  @%s %s  •  %s", n.Author, n.Body, renderAge(n.CreatedAt)),
-	) + "\n"
+// indentLines prefixa cada linha de s com n espaços.
+func indentLines(s string, n int) string {
+	pad := strings.Repeat(" ", n)
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = pad + line
+	}
+	return strings.Join(lines, "\n")
+}
+
+var (
+	htmlTagRe   = regexp.MustCompile(`<[^>]+>`)
+	mdEmphRe    = regexp.MustCompile("[*_`]+")
+	liRe        = regexp.MustCompile(`(?s)<li>(.*?)</li>`)
+	commitRe    = regexp.MustCompile(`(?i)^([0-9a-f]{7,40})\s*[-–]\s*(.+)$`)
+	compareLine = "[compare with previous version]"
+)
+
+// cleanSystemText remove tags HTML e marcadores markdown de ênfase, deixando
+// o texto plano legível.
+func cleanSystemText(s string) string {
+	s = htmlTagRe.ReplaceAllString(s, "")
+	s = mdEmphRe.ReplaceAllString(s, "")
+	return strings.TrimSpace(s)
+}
+
+type sysCommit struct {
+	sha string
+	msg string
+}
+
+// parseSystemNote separa a ação (primeira linha) dos commits embutidos em
+// notas "added N commits", descartando o link "Compare with previous version"
+// e o resumo de range do GitLab.
+func parseSystemNote(body string) (action string, commits []sysCommit) {
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if action == "" && !strings.Contains(line, "<li>") {
+			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), compareLine) {
+				continue
+			}
+			action = cleanSystemText(line)
+		}
+	}
+
+	for _, m := range liRe.FindAllStringSubmatch(body, -1) {
+		inner := cleanSystemText(m[1])
+		cm := commitRe.FindStringSubmatch(inner)
+		if cm == nil {
+			continue // pula resumo de range (ex.: "a7cf...822c - 2 commits from branch")
+		}
+		commits = append(commits, sysCommit{sha: cm[1], msg: strings.TrimSpace(cm[2])})
+	}
+	return action, commits
+}
+
+func renderSystemNote(n gitlab.Note, width int) string {
+	action, commits := parseSystemNote(n.Body)
+	if action == "" {
+		action = cleanSystemText(n.Body)
+	}
+
+	var sb strings.Builder
+	sb.WriteString(ui.StyleSystemNote.Render(
+		fmt.Sprintf("⚙  @%s %s  •  %s", n.Author, action, renderAge(n.CreatedAt)),
+	))
+	sb.WriteString("\n")
+
+	const maxCommits = 2
+	msgWidth := max(width-20, 16)
+	for i, c := range commits {
+		if i >= maxCommits {
+			sb.WriteString(ui.StyleMeta.Render(
+				fmt.Sprintf("    ↳ … +%d commits", len(commits)-maxCommits),
+			))
+			sb.WriteString("\n")
+			break
+		}
+		sha := c.sha
+		if len(sha) > 8 {
+			sha = sha[:8]
+		}
+		msg := c.msg
+		if len([]rune(msg)) > msgWidth {
+			msg = string([]rune(msg)[:msgWidth-1]) + "…"
+		}
+		sb.WriteString(ui.StyleMeta.Render(fmt.Sprintf("    ↳ %s  %s", sha, msg)))
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 func renderMarkdown(r *glamour.TermRenderer, body string) string {

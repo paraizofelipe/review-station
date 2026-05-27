@@ -11,8 +11,9 @@ var (
 	ColorPurple = lipgloss.Color("#d3869b")
 	ColorGray   = lipgloss.Color("#928374")
 	ColorRed    = lipgloss.Color("#cc241d")
-	ColorMuted  = lipgloss.Color("#a89984")
-	ColorBorder = lipgloss.Color("#504945")
+	ColorMuted   = lipgloss.Color("#a89984")
+	ColorBorder  = lipgloss.Color("#504945")
+	ColorSurface = lipgloss.Color("#3c3836")
 
 	StyleProjectHeader = lipgloss.NewStyle().
 				Foreground(ColorYellow).
@@ -63,18 +64,41 @@ var (
 			Foreground(ColorOrange).
 			Bold(true)
 
+	// StyleCommentBox envolve cada comentário (nota pai) em uma caixa de
+	// largura total, com fundo de superfície para destacá-la do terminal.
+	StyleCommentBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorBorder).
+			Background(ColorSurface).
+			Padding(0, 1)
+
+	// StyleReplyBox é a caixa das respostas; mesmo visual da caixa do pai,
+	// renderizada com largura menor e indentada pelo chamador.
+	StyleReplyBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorBorder).
+			Background(ColorSurface).
+			Padding(0, 1)
+
+	// Os estilos abaixo são usados DENTRO das caixas. Todos carregam
+	// Background(ColorSurface) para que cada span ANSI preencha o fundo e o
+	// fundo do terminal não vaze através dos resets do glamour.
 	StyleCommentAuthor = lipgloss.NewStyle().
 				Foreground(ColorBlue).
+				Background(ColorSurface).
 				Bold(true)
 
 	StyleReplyAuthor = lipgloss.NewStyle().
-				Foreground(ColorPurple)
+				Foreground(ColorPurple).
+				Background(ColorSurface)
 
 	StyleReplyArrow = lipgloss.NewStyle().
-			Foreground(ColorGray)
+			Foreground(ColorGray).
+			Background(ColorSurface)
 
 	StyleCommentDivider = lipgloss.NewStyle().
-				Foreground(ColorBorder)
+				Foreground(ColorBorder).
+				Background(ColorSurface)
 
 	StyleSystemNote = lipgloss.NewStyle().
 			Foreground(ColorGray).
@@ -85,6 +109,15 @@ var (
 
 	StyleResolvedBadge = lipgloss.NewStyle().
 				Foreground(ColorGreen)
+
+	// Variantes com fundo de superfície, para uso dentro das caixas de comentário.
+	StyleMetaOnSurface = lipgloss.NewStyle().
+				Foreground(ColorGray).
+				Background(ColorSurface)
+
+	StyleResolvedBadgeOnSurface = lipgloss.NewStyle().
+					Foreground(ColorGreen).
+					Background(ColorSurface)
 
 	StyleError = lipgloss.NewStyle().
 			Foreground(ColorRed)
