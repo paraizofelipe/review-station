@@ -19,6 +19,7 @@ type PipelineStatus struct {
 type MergeRequest struct {
 	IID          int
 	Title        string
+	Description  string
 	Author       string
 	SourceBranch string
 	TargetBranch string
@@ -29,9 +30,10 @@ type MergeRequest struct {
 }
 
 type mrResponse struct {
-	IID    int    `json:"iid"`
-	Title  string `json:"title"`
-	Author struct {
+	IID         int    `json:"iid"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Author      struct {
 		Username string `json:"username"`
 	} `json:"author"`
 	SourceBranch string `json:"source_branch"`
@@ -80,6 +82,7 @@ func (c Client) FetchMRs(ctx context.Context, repo config.Repo, state string) ([
 		mrs = append(mrs, MergeRequest{
 			IID:          r.IID,
 			Title:        r.Title,
+			Description:  r.Description,
 			Author:       r.Author.Username,
 			SourceBranch: r.SourceBranch,
 			TargetBranch: r.TargetBranch,

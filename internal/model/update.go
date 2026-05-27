@@ -26,7 +26,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Viewport.Height = vpHeight
 		}
 		if m.Screen == ScreenComments && len(m.Discussions) > 0 {
-			m.RenderedDiscussions = buildRenderedDiscussions(m.Discussions, m.Width)
+			m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Width)
 			m.Viewport.SetContent(m.RenderedDiscussions)
 		}
 		return m, nil
@@ -59,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.CommentsLoading = false
 		m.Discussions = msg.Discussions
-		m.RenderedDiscussions = buildRenderedDiscussions(m.Discussions, m.Width)
+		m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Width)
 		m.Viewport.SetContent(m.RenderedDiscussions)
 		return m, nil
 

@@ -292,15 +292,18 @@ func newCommentRenderer(wrap int, bg string) *glamour.TermRenderer {
 	return r
 }
 
-func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string {
-	if len(discussions) == 0 {
-		return ""
-	}
-
+func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, width int) string {
 	parentContent := max(width-boxChrome, 16)
 	replyContent := max(width-replyIndent-boxChrome, 12)
 	parentRenderer := newCommentRenderer(parentContent, string(ui.ColorBg))
 	replyRenderer := newCommentRenderer(replyContent, string(ui.ColorBg1))
+
+	var sb strings.Builder
+
+	if mr != nil && strings.TrimSpace(mr.Description) != "" {
+		sb.WriteString(renderMRDescription(mr, parentRenderer, parentContent))
+		sb.WriteString("\n")
+	}
 
 	var userDiscussions []gitlab.Discussion
 	var systemNotes []gitlab.Note
@@ -312,7 +315,6 @@ func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string
 		}
 	}
 
-	var sb strings.Builder
 	for i, d := range userDiscussions {
 		if i > 0 {
 			sb.WriteString("\n")
@@ -329,6 +331,15 @@ func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string
 		}
 	}
 	return sb.String()
+}
+
+func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer, contentWidth int) string {
+	header := ui.StyleCommentAuthor.Render("@"+mr.Author) +
+		ui.StyleMetaOnComment.Render("  •  "+renderAge(mr.CreatedAt))
+	divider := ui.StyleCommentDivider.Render(strings.Repeat("─", contentWidth))
+	body := strings.Trim(renderMarkdown(r, mr.Description), "\n")
+	inner := header + "\n" + divider + "\n" + body
+	return ui.StyleCommentBox.Width(contentWidth + 2).Render(inner) + "\n"
 }
 
 func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {

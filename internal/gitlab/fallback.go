@@ -11,9 +11,10 @@ import (
 )
 
 type glabMRResponse struct {
-	IID    int    `json:"iid"`
-	Title  string `json:"title"`
-	Author struct {
+	IID         int    `json:"iid"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Author      struct {
 		Username string `json:"username"`
 	} `json:"author"`
 	SourceBranch string `json:"source_branch"`
@@ -50,6 +51,7 @@ func FetchMRsFallback(ctx context.Context, repo config.Repo, state string) ([]Me
 		mrs = append(mrs, MergeRequest{
 			IID:          r.IID,
 			Title:        r.Title,
+			Description:  r.Description,
 			Author:       r.Author.Username,
 			SourceBranch: r.SourceBranch,
 			TargetBranch: r.TargetBranch,

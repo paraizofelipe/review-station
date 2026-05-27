@@ -35,8 +35,14 @@ func TestBoxRenderDump(t *testing.T) {
 		}},
 	}
 
+	mr := &gitlab.MergeRequest{
+		Author:      "felipe",
+		CreatedAt:   now.Add(-3 * time.Hour),
+		Description: "Ajusta o timeout do HTTP client para **15s** para evitar hanging requests.\n\n```go\nclient.Timeout = 15 * time.Second\n```",
+	}
+
 	width := 60
-	out := buildRenderedDiscussions(discussions, width)
+	out := buildRenderedDiscussions(mr, discussions, width)
 
 	// Dump legível (ANSI removido) para inspeção visual da estrutura.
 	t.Log("\n" + ansiRe.ReplaceAllString(out, ""))
