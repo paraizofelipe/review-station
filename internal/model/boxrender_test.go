@@ -52,9 +52,13 @@ func TestBoxRenderDump(t *testing.T) {
 		}
 	}
 
-	// O fundo de superfície (#3c3836) deve aparecer no output.
-	if !strings.Contains(out, "48;2;60;56;54") {
-		t.Errorf("esperava sequência de background da superfície no output")
+	// O fundo dos comment boxes (#282828) deve aparecer no output.
+	if !strings.Contains(out, "48;2;40;40;40") {
+		t.Errorf("esperava sequência de background do comment box (#282828) no output")
+	}
+	// O fundo dos reply boxes (#32302f) deve aparecer no output.
+	if !strings.Contains(out, "48;2;50;48;47") {
+		t.Errorf("esperava sequência de background do reply box (#32302f) no output")
 	}
 }
 

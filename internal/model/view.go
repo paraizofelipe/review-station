@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -267,57 +266,25 @@ const replyIndent = 3
 const boxChrome = 4
 
 // commentGlamourStyle clona o estilo "dark" do glamour zerando a margem do
-// documento (a caixa já fornece o padding) e pintando o fundo do documento
-// com a cor de superfície, para que o fundo do terminal não vaze pelos resets
-// ANSI dentro da caixa.
-func commentGlamourStyle() ansi.StyleConfig {
+// documento e definindo o fundo para corresponder ao background da caixa que
+// envolve o comentário, prevenindo sangramento de ANSI resets.
+func commentGlamourStyle(bg string) ansi.StyleConfig {
 	cfg := styles.DarkStyleConfig
 	zero := uint(0)
-	bg := string(ui.ColorSurface)
 	cfg.Document.Margin = &zero
 	cfg.Document.StylePrimitive.BackgroundColor = &bg
-
-	// O code block é destacado pelo chroma (formatter terminal256): tokens sem
-	// BackgroundColor resetam para o fundo do terminal, vazando dentro da caixa.
-	// Pintamos TODOS os tokens com a cor da superfície para que o bloco use o
-	// mesmo fundo do texto normal — sem virar um retângulo de cor distinta,
-	// mantendo só o syntax highlighting nas cores do texto.
-	// O Chroma é um ponteiro compartilhado com o estilo global — copiamos antes
-	// de mutar.
-	if cfg.CodeBlock.Chroma != nil {
-		chromaCopy := *cfg.CodeBlock.Chroma
-		setChromaBackground(&chromaCopy, bg)
-		cfg.CodeBlock.Chroma = &chromaCopy
-	}
-	cfg.CodeBlock.StylePrimitive.BackgroundColor = &bg
-	// Código inline (`x`) também herda o fundo da superfície.
+	// Código inline herda o fundo da caixa.
 	cfg.Code.StylePrimitive.BackgroundColor = &bg
 	return cfg
 }
 
-// setChromaBackground define BackgroundColor em todos os tokens StylePrimitive
-// do Chroma, garantindo que cada span emitido pelo chroma preencha o fundo.
-func setChromaBackground(c *ansi.Chroma, color string) {
-	v := reflect.ValueOf(c).Elem()
-	for i := 0; i < v.NumField(); i++ {
-		bg := v.Field(i).FieldByName("BackgroundColor")
-		if bg.IsValid() && bg.CanSet() {
-			bg.Set(reflect.ValueOf(&color))
-		}
-	}
-}
-
-func newCommentRenderer(wrap int) *glamour.TermRenderer {
+func newCommentRenderer(wrap int, bg string) *glamour.TermRenderer {
 	if wrap < 10 {
 		wrap = 10
 	}
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStyles(commentGlamourStyle()),
+		glamour.WithStyles(commentGlamourStyle(bg)),
 		glamour.WithWordWrap(wrap),
-		// terminal16m = truecolor; sem isso o chroma usa terminal256 e quantiza
-		// o fundo do código para uma cor 256 levemente diferente da superfície
-		// (truecolor), criando um retângulo visível dentro da caixa.
-		glamour.WithChromaFormatter("terminal16m"),
 	)
 	if err != nil {
 		return nil
@@ -332,8 +299,8 @@ func buildRenderedDiscussions(discussions []gitlab.Discussion, width int) string
 
 	parentContent := max(width-boxChrome, 16)
 	replyContent := max(width-replyIndent-boxChrome, 12)
-	parentRenderer := newCommentRenderer(parentContent)
-	replyRenderer := newCommentRenderer(replyContent)
+	parentRenderer := newCommentRenderer(parentContent, string(ui.ColorBg))
+	replyRenderer := newCommentRenderer(replyContent, string(ui.ColorBg1))
 
 	var userDiscussions []gitlab.Discussion
 	var systemNotes []gitlab.Note
@@ -374,10 +341,10 @@ func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamou
 		if isFirst {
 			isFirst = false
 			header := ui.StyleCommentAuthor.Render("@"+note.Author) +
-				ui.StyleMetaOnSurface.Render("  •  "+renderAge(note.CreatedAt))
+				ui.StyleMetaOnComment.Render("  •  "+renderAge(note.CreatedAt))
 			if note.Resolvable && note.Resolved {
-				header += ui.StyleMetaOnSurface.Render("  ") +
-					ui.StyleResolvedBadgeOnSurface.Render("[✓ resolvido]")
+				header += ui.StyleMetaOnComment.Render("  ") +
+					ui.StyleResolvedBadgeOnComment.Render("[✓ resolvido]")
 			}
 			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
 			body := strings.Trim(renderMarkdown(parentRenderer, note.Body), "\n")
@@ -387,7 +354,7 @@ func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamou
 		} else {
 			header := ui.StyleReplyArrow.Render("↳ ") +
 				ui.StyleReplyAuthor.Render("@"+note.Author) +
-				ui.StyleMetaOnSurface.Render("  •  "+renderAge(note.CreatedAt))
+				ui.StyleMetaOnReply.Render("  •  "+renderAge(note.CreatedAt))
 			body := strings.Trim(renderMarkdown(replyRenderer, note.Body), "\n")
 			inner := header + "\n" + body
 			box := ui.StyleReplyBox.Width(replyContent + 2).Render(inner)
