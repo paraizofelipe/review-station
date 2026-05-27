@@ -460,9 +460,11 @@ func renderSystemNote(n gitlab.Note, width int) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(ui.StyleSystemNote.Render(
-		fmt.Sprintf("⚙  @%s %s  •  %s", n.Author, action, renderAge(n.CreatedAt)),
-	))
+	line := ui.StyleSystemNote.Render("⚙  ") +
+		ui.StyleSystemNoteAuthor.Render("@"+n.Author) +
+		ui.StyleSystemNote.Render(" "+action+"  ") +
+		ui.StyleSystemNoteTime.Render("• "+renderAge(n.CreatedAt))
+	sb.WriteString(line)
 	sb.WriteString("\n")
 
 	const maxCommits = 2

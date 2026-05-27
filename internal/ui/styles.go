@@ -105,6 +105,14 @@ var (
 			Foreground(ColorGray).
 			Italic(true)
 
+	StyleSystemNoteAuthor = lipgloss.NewStyle().
+				Foreground(ColorBlue).
+				Italic(true)
+
+	StyleSystemNoteTime = lipgloss.NewStyle().
+				Foreground(ColorBorder). // #504945 — bem discreto
+				Italic(true)
+
 	StyleSectionDivider = lipgloss.NewStyle().
 				Foreground(ColorGray)
 
