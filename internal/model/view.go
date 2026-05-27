@@ -271,10 +271,15 @@ const boxChrome = 4
 func commentGlamourStyle(bg string) ansi.StyleConfig {
 	cfg := styles.DarkStyleConfig
 	zero := uint(0)
+	black := "#000000"
 	cfg.Document.Margin = &zero
 	cfg.Document.StylePrimitive.BackgroundColor = &bg
 	// Código inline herda o fundo da caixa.
 	cfg.Code.StylePrimitive.BackgroundColor = &bg
+	// Blocos de código: fundo preto, sem margem lateral (o preenchimento de
+	// espaços no pré-processamento estende o fundo até a largura do conteúdo).
+	cfg.CodeBlock.Margin = &zero
+	cfg.CodeBlock.StylePrimitive.BackgroundColor = &black
 	return cfg
 }
 
@@ -300,7 +305,10 @@ func newDescriptionRenderer(wrap int) *glamour.TermRenderer {
 	}
 	cfg := styles.DarkStyleConfig
 	zero := uint(0)
+	black := "#000000"
 	cfg.Document.Margin = &zero
+	cfg.CodeBlock.Margin = &zero
+	cfg.CodeBlock.StylePrimitive.BackgroundColor = &black
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStyles(cfg),
 		glamour.WithWordWrap(wrap),
@@ -321,7 +329,7 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 	var sb strings.Builder
 
 	if mr != nil && strings.TrimSpace(mr.Description) != "" {
-		sb.WriteString(renderMRDescription(mr, descRenderer))
+		sb.WriteString(renderMRDescription(mr, descRenderer, parentContent))
 	}
 
 	var userDiscussions []gitlab.Discussion
@@ -360,10 +368,10 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 	return sb.String()
 }
 
-func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer) string {
+func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer, codeWidth int) string {
 	header := ui.StyleCommentAuthor.Render("@"+mr.Author) +
 		ui.StyleMeta.Render("  •  "+renderAge(mr.CreatedAt))
-	body := strings.Trim(renderMarkdown(r, mr.Description), "\n")
+	body := strings.Trim(renderMarkdownPadded(r, mr.Description, codeWidth), "\n")
 	content := header + "\n\n" + body
 	return "\n\n" + indentLines(content, 2) + "\n"
 }
@@ -384,7 +392,7 @@ func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamou
 					ui.StyleResolvedBadgeOnComment.Render("[✓ resolvido]")
 			}
 			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
-			body := strings.Trim(renderMarkdown(parentRenderer, note.Body), "\n")
+			body := strings.Trim(renderMarkdownPadded(parentRenderer, note.Body, parentContent), "\n")
 			inner := header + "\n" + divider + "\n" + body
 			box := ui.StyleCommentBox.Width(parentContent + 2).Render(inner)
 			sb.WriteString(box + "\n")
@@ -392,7 +400,7 @@ func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamou
 			header := ui.StyleReplyArrow.Render("↳ ") +
 				ui.StyleReplyAuthor.Render("@"+note.Author) +
 				ui.StyleMetaOnReply.Render("  •  "+renderAge(note.CreatedAt))
-			body := strings.Trim(renderMarkdown(replyRenderer, note.Body), "\n")
+			body := strings.Trim(renderMarkdownPadded(replyRenderer, note.Body, replyContent), "\n")
 			inner := header + "\n" + body
 			box := ui.StyleReplyBox.Width(replyContent + 2).Render(inner)
 			sb.WriteString(indentLines(box, replyIndent) + "\n")
@@ -507,6 +515,41 @@ func renderMarkdown(r *glamour.TermRenderer, body string) string {
 		return body + "\n"
 	}
 	return rendered
+}
+
+// padCodeBlocksInMarkdown preenchee cada linha dentro de blocos de código
+// cercados (```…```) com espaços até `width` colunas. Isso faz com que o
+// renderer de fallback do glamour aplique o BackgroundColor ao longo de toda
+// a largura da linha, e não apenas ao texto.
+func padCodeBlocksInMarkdown(md string, width int) string {
+	lines := strings.Split(md, "\n")
+	inCode := false
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " \t")
+		if !inCode {
+			if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+				inCode = true
+			}
+		} else {
+			// Linha de fechamento: só caracteres de cerca, sem info-string.
+			allFence := strings.TrimRight(trimmed, "`") == "" || strings.TrimRight(trimmed, "~") == ""
+			if allFence && len(trimmed) >= 3 {
+				inCode = false
+			} else {
+				runes := []rune(line)
+				if len(runes) < width {
+					lines[i] = line + strings.Repeat(" ", width-len(runes))
+				}
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// renderMarkdownPadded aplica padCodeBlocksInMarkdown antes de renderizar,
+// garantindo background de largura total nos blocos de código.
+func renderMarkdownPadded(r *glamour.TermRenderer, body string, codeWidth int) string {
+	return renderMarkdown(r, padCodeBlocksInMarkdown(body, codeWidth))
 }
 
 func (m Model) anyLoading() bool {
