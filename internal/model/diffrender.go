@@ -31,6 +31,21 @@ func renderDiffBlock(lines []gitlab.DiffLine, path string, contentWidth int) str
 		style = chromaStyles.Fallback
 	}
 
+	// Calcula a largura do gutter de números de linha.
+	maxLine := 0
+	for _, l := range lines {
+		if l.NewLine > maxLine {
+			maxLine = l.NewLine
+		}
+		if l.OldLine > maxLine {
+			maxLine = l.OldLine
+		}
+	}
+	lineNumWidth := len(fmt.Sprintf("%d", maxLine))
+	if lineNumWidth < 1 {
+		lineNumWidth = 1
+	}
+
 	// Tokeniza todas as linhas de uma vez para o lexer ter contexto completo.
 	tokensByLine := tokenizeForDiff(lines, path)
 
@@ -54,7 +69,7 @@ func renderDiffBlock(lines []gitlab.DiffLine, path string, contentWidth int) str
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(renderHighlightedLine(toks, l.Content, l.Kind, bgHex, style, contentWidth))
+		sb.WriteString(renderHighlightedLine(toks, l.Content, l.Kind, l.OldLine, l.NewLine, lineNumWidth, bgHex, style, contentWidth))
 	}
 	return sb.String()
 }
@@ -93,25 +108,41 @@ func tokenizeForDiff(lines []gitlab.DiffLine, path string) [][]chroma.Token {
 	return byLine
 }
 
+// lineNumGray é a cor gruvbox gray (#928374) para os números de linha.
+const lineNumGray = "\x1b[38;2;146;131;116m"
+
 // renderHighlightedLine emite uma linha com:
 //  1. background ANSI cobrindo toda a largura (contentWidth colunas)
-//  2. prefixo "+"/"-"/" " colorido
-//  3. tokens com foreground do estilo chroma (sem background — herdamos o nosso)
-//  4. reset de foreground (não de background) entre tokens, para manter o bg
-//  5. padding de espaços até contentWidth antes do reset final
-func renderHighlightedLine(tokens []chroma.Token, fallback string, kind gitlab.DiffLineKind, bgHex string, style *chroma.Style, width int) string {
+//  2. gutter de números de linha (old│new) em cinza discreto
+//  3. prefixo "+"/"-"/" " colorido
+//  4. tokens com foreground do estilo chroma (sem background — herdamos o nosso)
+//  5. reset de foreground (não de background) entre tokens, para manter o bg
+//  6. padding de espaços até contentWidth antes do reset final
+func renderHighlightedLine(tokens []chroma.Token, fallback string, kind gitlab.DiffLineKind, oldLine, newLine, lineNumWidth int, bgHex string, style *chroma.Style, width int) string {
 	bgSeq := hexBgANSI(bgHex)
-	r, g, b := hexRGB(bgHex)
-	_ = r
-	_ = g
-	_ = b
 
 	var sb strings.Builder
 
 	// 1. Ativa background da linha.
 	sb.WriteString(bgSeq)
 
-	// 2. Prefixo: símbolo +/- em bold, espaço separador.
+	// 2. Gutter de números de linha: old e new, alinhados à direita.
+	//    Coluna vazia quando a linha não existe para aquele lado do diff.
+	if oldLine > 0 {
+		sb.WriteString(fmt.Sprintf("%s%*d", lineNumGray, lineNumWidth, oldLine))
+	} else {
+		sb.WriteString(strings.Repeat(" ", lineNumWidth))
+	}
+	sb.WriteString(" ")
+	if newLine > 0 {
+		sb.WriteString(fmt.Sprintf("%s%*d", lineNumGray, lineNumWidth, newLine))
+	} else {
+		sb.WriteString(strings.Repeat(" ", lineNumWidth))
+	}
+	// Reset fg antes do prefixo +/-.
+	sb.WriteString("\x1b[39m ")
+
+	// 3. Prefixo: símbolo +/- em bold, espaço separador.
 	switch kind {
 	case gitlab.DiffLineKindAdded:
 		// bold bright green
@@ -123,7 +154,7 @@ func renderHighlightedLine(tokens []chroma.Token, fallback string, kind gitlab.D
 		sb.WriteString("  ")
 	}
 
-	// 3. Tokens com foreground do style chroma. Usa \x1b[39m (reset fg only)
+	// 4. Tokens com foreground do style chroma. Usa \x1b[39m (reset fg only)
 	// entre tokens para não limpar o background que definimos acima.
 	if len(tokens) == 0 {
 		sb.WriteString(fallback)
@@ -160,14 +191,14 @@ func renderHighlightedLine(tokens []chroma.Token, fallback string, kind gitlab.D
 		}
 	}
 
-	// 4. Mede a largura visível atual e preenche com espaços (bg ainda ativo).
+	// 5. Mede a largura visível atual e preenche com espaços (bg ainda ativo).
 	line := sb.String()
 	visible := lipgloss.Width(line)
 	if visible < width {
 		sb.WriteString(strings.Repeat(" ", width-visible))
 	}
 
-	// 5. Reset total ao fim da linha.
+	// 6. Reset total ao fim da linha.
 	sb.WriteString("\x1b[0m")
 	return sb.String()
 }
