@@ -357,7 +357,7 @@ func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer) strin
 	header := ui.StyleCommentAuthor.Render("@"+mr.Author) +
 		ui.StyleMeta.Render("  •  "+renderAge(mr.CreatedAt))
 	body := strings.Trim(renderMarkdown(r, mr.Description), "\n")
-	return header + "\n" + body + "\n"
+	return "\n\n" + header + "\n\n" + body + "\n"
 }
 
 func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {
