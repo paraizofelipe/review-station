@@ -292,16 +292,36 @@ func newCommentRenderer(wrap int, bg string) *glamour.TermRenderer {
 	return r
 }
 
+// newDescriptionRenderer cria um renderer sem background definido, para que
+// o conteúdo herde o fundo padrão do terminal.
+func newDescriptionRenderer(wrap int) *glamour.TermRenderer {
+	if wrap < 10 {
+		wrap = 10
+	}
+	cfg := styles.DarkStyleConfig
+	zero := uint(0)
+	cfg.Document.Margin = &zero
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStyles(cfg),
+		glamour.WithWordWrap(wrap),
+	)
+	if err != nil {
+		return nil
+	}
+	return r
+}
+
 func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, width int) string {
 	parentContent := max(width-boxChrome, 16)
 	replyContent := max(width-replyIndent-boxChrome, 12)
+	descRenderer := newDescriptionRenderer(parentContent)
 	parentRenderer := newCommentRenderer(parentContent, string(ui.ColorBg))
 	replyRenderer := newCommentRenderer(replyContent, string(ui.ColorBg1))
 
 	var sb strings.Builder
 
 	if mr != nil && strings.TrimSpace(mr.Description) != "" {
-		sb.WriteString(renderMRDescription(mr, parentRenderer))
+		sb.WriteString(renderMRDescription(mr, descRenderer))
 		sb.WriteString("\n")
 	}
 
