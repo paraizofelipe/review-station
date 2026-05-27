@@ -27,6 +27,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.Screen == ScreenComments && len(m.Discussions) > 0 {
 			m.RenderedDiscussions = buildRenderedDiscussions(m.Discussions, m.Width)
+			m.Viewport.SetContent(m.RenderedDiscussions)
 		}
 		return m, nil
 
@@ -59,6 +60,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.CommentsLoading = false
 		m.Discussions = msg.Discussions
 		m.RenderedDiscussions = buildRenderedDiscussions(m.Discussions, m.Width)
+		m.Viewport.SetContent(m.RenderedDiscussions)
 		return m, nil
 
 	case FetchDiscussionsErrorMsg:
