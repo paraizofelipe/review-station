@@ -301,7 +301,7 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 	var sb strings.Builder
 
 	if mr != nil && strings.TrimSpace(mr.Description) != "" {
-		sb.WriteString(renderMRDescription(mr, parentRenderer, parentContent))
+		sb.WriteString(renderMRDescription(mr, parentRenderer))
 		sb.WriteString("\n")
 	}
 
@@ -333,13 +333,11 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 	return sb.String()
 }
 
-func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer, contentWidth int) string {
+func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer) string {
 	header := ui.StyleCommentAuthor.Render("@"+mr.Author) +
-		ui.StyleMetaOnComment.Render("  •  "+renderAge(mr.CreatedAt))
-	divider := ui.StyleCommentDivider.Render(strings.Repeat("─", contentWidth))
+		ui.StyleMeta.Render("  •  "+renderAge(mr.CreatedAt))
 	body := strings.Trim(renderMarkdown(r, mr.Description), "\n")
-	inner := header + "\n" + divider + "\n" + body
-	return ui.StyleCommentBox.Width(contentWidth + 2).Render(inner) + "\n"
+	return header + "\n" + body + "\n"
 }
 
 func renderDiscussion(d gitlab.Discussion, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {
