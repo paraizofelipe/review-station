@@ -132,6 +132,11 @@ var (
 					Foreground(ColorGreen).
 					Background(ColorBg)
 
+	// StyleTimeline é usado para a barra │ e os conectores de árvore ├─/└─
+	// na lateral esquerda dos comentários e respostas.
+	StyleTimeline = lipgloss.NewStyle().
+			Foreground(ColorBorder)
+
 	StyleError = lipgloss.NewStyle().
 			Foreground(ColorRed)
 
