@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -111,6 +112,37 @@ func FetchDiscussionsFallback(ctx context.Context, repo config.Repo, mrIID int) 
 	}
 
 	return parseDiscussions(raw), nil
+}
+
+// ReplyToDiscussion posta uma nova nota em uma discussion existente.
+func (c Client) ReplyToDiscussion(ctx context.Context, repo config.Repo, mrIID int, discussionID, body string) error {
+	encoded := url.PathEscape(repo.Path)
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/discussions/%s/notes",
+		c.BaseURL, encoded, mrIID, url.PathEscape(discussionID))
+
+	payload, err := json.Marshal(map[string]string{"body": body})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("gitlab retornou %d ao responder à discussion %s", resp.StatusCode, discussionID)
+	}
+	return nil
 }
 
 func parseDiscussions(raw []discussionResponse) []Discussion {

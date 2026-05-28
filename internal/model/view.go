@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/glamour/styles"
@@ -18,6 +19,10 @@ import (
 func (m Model) View() string {
 	if !m.Ready {
 		return "inicializando..."
+	}
+
+	if m.Screen == ScreenReply {
+		return m.renderReplyView()
 	}
 
 	if m.Screen == ScreenComments {
@@ -240,8 +245,108 @@ func (m Model) renderCommentsHeader() string {
 
 func (m Model) renderCommentsStatusbar() string {
 	return ui.StyleStatusBar.Width(m.Width).Render(
-		"j/k scroll  tab/shift+tab comentário  c colapsar  ctrl+d/u página  backspace voltar  q sair",
+		"j/k scroll  tab/shift+tab comentário  r responder  c colapsar  ctrl+d/u página  backspace voltar  q sair",
 	)
+}
+
+// replyTextareaHeight returns the inner content line count for the reply
+// textarea, reserving the bottom half of the screen for the markdown preview.
+func replyTextareaHeight(totalH int) int {
+	h := (totalH - 8) / 2
+	if h < 3 {
+		h = 3
+	}
+	return h
+}
+
+func (m Model) renderReplyView() string {
+	header := m.renderReplyHeader()
+	statusbar := m.renderReplyStatusbar()
+	previewLines := max(m.Height-8-replyTextareaHeight(m.Height), 2)
+	divider := ui.StyleSectionDivider.Render("── Preview " + strings.Repeat("─", max(m.Width-12, 4)))
+	var sb strings.Builder
+	sb.WriteString(header)
+	sb.WriteString("\n")
+	sb.WriteString(m.ReplyInput.View())
+	sb.WriteString(divider + "\n")
+	sb.WriteString(m.renderReplyPreview(previewLines))
+	sb.WriteString(statusbar)
+	return sb.String()
+}
+
+// renderReplyPreview renders up to maxLines of the current textarea content
+// using glamour (markdown + syntax highlighting), or a placeholder if empty.
+func (m Model) renderReplyPreview(maxLines int) string {
+	body := m.ReplyInput.Value()
+	renderWidth := max(m.Width-2, 10)
+	if strings.TrimSpace(body) == "" {
+		return ui.StyleMeta.Render("  (preview vazio)") + "\n"
+	}
+	r := newDescriptionRenderer(renderWidth)
+	text := strings.Trim(renderMarkdownPadded(r, body, renderWidth), "\n")
+	lines := strings.Split(text, "\n")
+	if len(lines) > maxLines {
+		lines = lines[:maxLines]
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func (m Model) renderReplyHeader() string {
+	right := ui.StyleMeta.Render("esc cancelar")
+	raw := "↳ Respondendo"
+	idx := 0
+	for _, d := range m.Discussions {
+		if len(d.Notes) == 0 || d.Notes[0].System {
+			continue
+		}
+		if idx == m.CommentCursor {
+			raw = fmt.Sprintf("↳ Respondendo a @%s", d.Notes[0].Author)
+			break
+		}
+		idx++
+	}
+	maxLeft := m.Width - lipgloss.Width(right) - 2
+	if maxLeft < 1 {
+		maxLeft = 1
+	}
+	if len([]rune(raw)) > maxLeft {
+		raw = string([]rune(raw)[:maxLeft-1]) + "…"
+	}
+	left := ui.StyleTitleBar.Render(raw)
+	gap := m.Width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		gap = 1
+	}
+	return lipgloss.NewStyle().Width(m.Width).Render(left + strings.Repeat(" ", gap) + right)
+}
+
+func (m Model) renderReplyStatusbar() string {
+	var hint string
+	if m.ReplySending {
+		hint = ui.StyleMeta.Render("[enviando...]")
+	} else if m.ReplyError != nil {
+		hint = ui.StyleError.Render("Erro: " + m.ReplyError.Error())
+	} else {
+		hint = "ctrl+s enviar  esc cancelar"
+	}
+	return ui.StyleStatusBar.Width(m.Width).Render(hint)
+}
+
+// newReplyInput cria e estiliza o textarea de resposta.
+func newReplyInput() textarea.Model {
+	ta := textarea.New()
+	ta.Placeholder = "Escreva sua resposta..."
+	ta.FocusedStyle.Base = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ui.ColorOrange)
+	ta.BlurredStyle.Base = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ui.ColorBorder)
+	ta.FocusedStyle.Text = lipgloss.NewStyle().Foreground(ui.ColorFg)
+	ta.BlurredStyle.Text = lipgloss.NewStyle().Foreground(ui.ColorMuted)
+	ta.FocusedStyle.Placeholder = lipgloss.NewStyle().Foreground(ui.ColorGray)
+	ta.BlurredStyle.Placeholder = lipgloss.NewStyle().Foreground(ui.ColorGray)
+	return ta
 }
 
 func (m Model) renderDiscussions() string {

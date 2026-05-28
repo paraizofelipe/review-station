@@ -1,6 +1,10 @@
 package model
 
 import (
+	"context"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"paraizofelipe/review-station/internal/config"
@@ -29,6 +33,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Screen == ScreenComments && len(m.Discussions) > 0 {
 			m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
 			m.Viewport.SetContent(m.RenderedDiscussions)
+		}
+		if m.Screen == ScreenReply {
+			m.ReplyInput.SetWidth(m.Width - 2)
+			m.ReplyInput.SetHeight(replyTextareaHeight(m.Height))
 		}
 		return m, nil
 
@@ -93,7 +101,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Diffs são opcionais: não bloqueia exibição dos comentários.
 		return m, nil
 
+	case ReplySuccessMsg:
+		if msg.Token != m.fetchToken {
+			return m, nil
+		}
+		m.ReplySending = false
+		m.Screen = ScreenComments
+		m.ReplyInput.Blur()
+		m.ReplyInput.Reset()
+		m.CommentsLoading = true
+		return m, fetchDiscussionsCmd(m.Client, m.ActiveRepo, m.ActiveMR.IID, m.fetchToken)
+
+	case ReplyErrorMsg:
+		if msg.Token != m.fetchToken {
+			return m, nil
+		}
+		m.ReplySending = false
+		m.ReplyError = msg.Err
+		return m, nil
+
 	case tea.KeyMsg:
+		if m.Screen == ScreenReply {
+			return m.updateReply(msg)
+		}
 		if m.Screen == ScreenComments {
 			return m.updateComments(msg)
 		}
@@ -101,6 +131,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateFilter(msg)
 		}
 		return m.updateList(msg)
+	}
+
+	// Repassa mensagens não-teclado para o textarea quando na tela de reply
+	// (necessário para animação do cursor e outros eventos internos do widget).
+	if m.Screen == ScreenReply {
+		var cmd tea.Cmd
+		m.ReplyInput, cmd = m.ReplyInput.Update(msg)
+		return m, cmd
 	}
 
 	return m, nil
@@ -240,6 +278,21 @@ func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case "r":
+		if m.CommentCursor >= 0 && !m.CommentsLoading {
+			if discID := getDiscussionID(m.Discussions, m.CommentCursor); discID != "" {
+				m.ReplyDiscussionID = discID
+				m.ReplyError = nil
+				m.ReplySending = false
+				m.Screen = ScreenReply
+				m.ReplyInput.Reset()
+				m.ReplyInput.SetWidth(m.Width - 2)
+				m.ReplyInput.SetHeight(replyTextareaHeight(m.Height))
+				m.ReplyInput.Focus()
+				return m, textarea.Blink
+			}
+		}
+		return m, nil
 	case "c":
 		if m.CommentCursor >= 0 && !m.CommentsLoading {
 			if m.CollapsedComments == nil {
@@ -267,6 +320,62 @@ func countUserDiscussions(discussions []gitlab.Discussion) int {
 		}
 	}
 	return n
+}
+
+// ReplySuccessMsg é emitido quando o envio de uma resposta tem sucesso.
+type ReplySuccessMsg struct{ Token int64 }
+
+// ReplyErrorMsg é emitido quando o envio de uma resposta falha.
+type ReplyErrorMsg struct {
+	Token int64
+	Err   error
+}
+
+func (m Model) updateReply(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.Screen = ScreenComments
+		m.ReplyInput.Blur()
+		return m, nil
+	case "ctrl+s":
+		body := strings.TrimSpace(m.ReplyInput.Value())
+		if body != "" && !m.ReplySending {
+			m.ReplySending = true
+			m.ReplyError = nil
+			return m, sendReplyCmd(m.Client, m.ActiveRepo, m.ActiveMR.IID, m.ReplyDiscussionID, body, m.fetchToken)
+		}
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.ReplyInput, cmd = m.ReplyInput.Update(msg)
+	return m, cmd
+}
+
+func sendReplyCmd(client gitlab.Client, repo config.Repo, mrIID int, discussionID, body string, token int64) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		err := client.ReplyToDiscussion(ctx, repo, mrIID, discussionID, body)
+		if err != nil {
+			return ReplyErrorMsg{Token: token, Err: err}
+		}
+		return ReplySuccessMsg{Token: token}
+	}
+}
+
+// getDiscussionID retorna o ID da discussion no índice cursor (base-0
+// nos comentários de usuário).
+func getDiscussionID(discussions []gitlab.Discussion, cursor int) string {
+	idx := 0
+	for _, d := range discussions {
+		if len(d.Notes) == 0 || d.Notes[0].System {
+			continue
+		}
+		if idx == cursor {
+			return d.ID
+		}
+		idx++
+	}
+	return ""
 }
 
 // preCollapseResolved constrói o mapa inicial de colapso com todos os

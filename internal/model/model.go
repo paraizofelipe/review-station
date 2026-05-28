@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -31,6 +32,7 @@ type Screen int
 const (
 	ScreenList     Screen = iota
 	ScreenComments
+	ScreenReply
 )
 
 type ListItem struct {
@@ -77,6 +79,10 @@ type Model struct {
 	CommentCursor       int          // índice do comentário selecionado (-1 = nenhum)
 	CommentOffsets      []int        // offset em linhas de cada comentário no viewport
 	CollapsedComments   map[int]bool // índices dos comentários colapsados
+	ReplyInput          textarea.Model
+	ReplyDiscussionID   string
+	ReplySending        bool
+	ReplyError          error
 	fetchToken          int64
 	listScrollOffset    int
 }
@@ -126,6 +132,7 @@ func New(cfg config.Config, client gitlab.Client) Model {
 		Errors:        errors,
 		Filter:        FilterOpened,
 		CommentCursor: -1,
+		ReplyInput:    newReplyInput(),
 		FilterMenu: FilterMenu{
 			Options: []FilterState{FilterOpened, FilterClosed, FilterMerged, FilterAll},
 		},
