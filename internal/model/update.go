@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"paraizofelipe/review-station/internal/config"
+	"paraizofelipe/review-station/internal/gitlab"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -26,7 +27,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Viewport.Height = vpHeight
 		}
 		if m.Screen == ScreenComments && len(m.Discussions) > 0 {
-			m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width)
+			m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
 			m.Viewport.SetContent(m.RenderedDiscussions)
 		}
 		return m, nil
@@ -59,7 +60,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.CommentsLoading = false
 		m.Discussions = msg.Discussions
-		m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width)
+		m.CollapsedComments = preCollapseResolved(msg.Discussions)
+		m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
 		m.Viewport.SetContent(m.RenderedDiscussions)
 		return m, nil
 
@@ -78,7 +80,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.DiffsLoading = false
 		m.Diffs = msg.Diffs
 		if !m.CommentsLoading && len(m.Discussions) > 0 {
-			m.RenderedDiscussions = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width)
+			m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
 			m.Viewport.SetContent(m.RenderedDiscussions)
 		}
 		return m, nil
@@ -142,6 +144,9 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CommentsError = nil
 			m.DiffsLoading = true
 			m.RenderedDiscussions = ""
+			m.CommentCursor = -1
+			m.CommentOffsets = nil
+			m.CollapsedComments = nil
 			m.listScrollOffset = m.Viewport.YOffset
 			m.Viewport.YOffset = 0
 			return m, tea.Batch(
@@ -202,14 +207,83 @@ func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "backspace", "esc":
 		m.Screen = ScreenList
+		m.CommentCursor = -1
 		m.Viewport.YOffset = m.listScrollOffset
 		return m, nil
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "tab":
+		if n := countUserDiscussions(m.Discussions); n > 0 {
+			if m.CommentCursor < 0 {
+				m.CommentCursor = 0
+			} else {
+				m.CommentCursor = (m.CommentCursor + 1) % n
+			}
+			m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
+			m.Viewport.SetContent(m.RenderedDiscussions)
+			if m.CommentCursor < len(m.CommentOffsets) {
+				m.Viewport.YOffset = m.CommentOffsets[m.CommentCursor]
+			}
+		}
+		return m, nil
+	case "shift+tab":
+		if n := countUserDiscussions(m.Discussions); n > 0 {
+			if m.CommentCursor < 0 {
+				m.CommentCursor = n - 1
+			} else {
+				m.CommentCursor = (m.CommentCursor - 1 + n) % n
+			}
+			m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
+			m.Viewport.SetContent(m.RenderedDiscussions)
+			if m.CommentCursor < len(m.CommentOffsets) {
+				m.Viewport.YOffset = m.CommentOffsets[m.CommentCursor]
+			}
+		}
+		return m, nil
+	case "c":
+		if m.CommentCursor >= 0 && !m.CommentsLoading {
+			if m.CollapsedComments == nil {
+				m.CollapsedComments = make(map[int]bool)
+			}
+			m.CollapsedComments[m.CommentCursor] = !m.CollapsedComments[m.CommentCursor]
+			m.RenderedDiscussions, m.CommentOffsets = buildRenderedDiscussions(m.ActiveMR, m.Discussions, m.Diffs, m.Width, m.CommentCursor, m.CollapsedComments)
+			m.Viewport.SetContent(m.RenderedDiscussions)
+			if m.CommentCursor < len(m.CommentOffsets) {
+				m.Viewport.YOffset = m.CommentOffsets[m.CommentCursor]
+			}
+		}
+		return m, nil
 	}
 	var cmd tea.Cmd
 	m.Viewport, cmd = m.Viewport.Update(msg)
 	return m, cmd
+}
+
+func countUserDiscussions(discussions []gitlab.Discussion) int {
+	n := 0
+	for _, d := range discussions {
+		if len(d.Notes) > 0 && !d.Notes[0].System {
+			n++
+		}
+	}
+	return n
+}
+
+// preCollapseResolved constrói o mapa inicial de colapso com todos os
+// comentários resolvidos já colapsados.
+func preCollapseResolved(discussions []gitlab.Discussion) map[int]bool {
+	collapsed := make(map[int]bool)
+	idx := 0
+	for _, d := range discussions {
+		if len(d.Notes) == 0 || d.Notes[0].System {
+			continue
+		}
+		if d.Notes[0].Resolvable && d.Notes[0].Resolved {
+			collapsed[idx] = true
+		}
+		idx++
+	}
+	return collapsed
 }
 
 func sortProjectsByConfig(projects []ProjectGroup, repos []config.Repo) []ProjectGroup {

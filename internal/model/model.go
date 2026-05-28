@@ -74,6 +74,9 @@ type Model struct {
 	CommentsError    error
 	DiffsLoading     bool
 	RenderedDiscussions string
+	CommentCursor       int          // índice do comentário selecionado (-1 = nenhum)
+	CommentOffsets      []int        // offset em linhas de cada comentário no viewport
+	CollapsedComments   map[int]bool // índices dos comentários colapsados
 	fetchToken          int64
 	listScrollOffset    int
 }
@@ -117,11 +120,12 @@ func New(cfg config.Config, client gitlab.Client) Model {
 		loading[r.Path] = true
 	}
 	return Model{
-		Config:  cfg,
-		Client:  client,
-		Loading: loading,
-		Errors:  errors,
-		Filter:  FilterOpened,
+		Config:        cfg,
+		Client:        client,
+		Loading:       loading,
+		Errors:        errors,
+		Filter:        FilterOpened,
+		CommentCursor: -1,
 		FilterMenu: FilterMenu{
 			Options: []FilterState{FilterOpened, FilterClosed, FilterMerged, FilterAll},
 		},

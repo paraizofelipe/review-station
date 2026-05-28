@@ -42,7 +42,7 @@ func TestBoxRenderDump(t *testing.T) {
 	}
 
 	width := 60
-	out := buildRenderedDiscussions(mr, discussions, nil, width)
+	out, _ := buildRenderedDiscussions(mr, discussions, nil, width, -1, nil)
 
 	// Dump legível (ANSI removido) para inspeção visual da estrutura.
 	t.Log("\n" + ansiRe.ReplaceAllString(out, ""))
@@ -65,6 +65,56 @@ func TestBoxRenderDump(t *testing.T) {
 	// O fundo dos reply boxes (#32302f) deve aparecer no output.
 	if !strings.Contains(out, "48;2;50;48;47") {
 		t.Errorf("esperava sequência de background do reply box (#32302f) no output")
+	}
+}
+
+func TestCollapsedDiscussion(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	now := time.Now()
+	discussions := []gitlab.Discussion{
+		{Notes: []gitlab.Note{
+			{Author: "maria", CreatedAt: now.Add(-2 * time.Hour), Resolvable: true, Resolved: true,
+				Body: "Acho que esse método deveria validar o input."},
+			{Author: "joao", CreatedAt: now.Add(-time.Hour), Body: "Concordo."},
+		}},
+		{Notes: []gitlab.Note{
+			{Author: "ana", CreatedAt: now.Add(-30 * time.Minute), Body: "Pode renomear?"},
+		}},
+	}
+
+	width := 60
+	collapsed := map[int]bool{0: true} // colapsa o primeiro comentário
+	out, offsets := buildRenderedDiscussions(nil, discussions, nil, width, -1, collapsed)
+	plain := ansiRe.ReplaceAllString(out, "")
+
+	// Deve ter 2 offsets (um por comentário de usuário).
+	if len(offsets) != 2 {
+		t.Fatalf("esperava 2 offsets, got %d", len(offsets))
+	}
+
+	// Comentário colapsado deve mostrar contagem de notas.
+	if !strings.Contains(plain, "▸ 2 notas") {
+		t.Errorf("comentário colapsado deveria mostrar '▸ 2 notas': %q", plain)
+	}
+
+	// Comentário colapsado não deve mostrar o corpo da nota.
+	if strings.Contains(plain, "Acho que esse método deveria validar o input.") {
+		t.Errorf("comentário colapsado não deveria mostrar o corpo")
+	}
+
+	// Segundo comentário (não colapsado) deve aparecer normalmente.
+	if !strings.Contains(plain, "Pode renomear?") {
+		t.Errorf("comentário não colapsado deveria mostrar o corpo")
+	}
+
+	// Linhas de borda não devem exceder o width.
+	for _, line := range strings.Split(out, "\n") {
+		p := ansiRe.ReplaceAllString(line, "")
+		if strings.ContainsAny(p, "╭╰") {
+			if w := visibleWidth(line); w > width {
+				t.Errorf("borda excede %d: %d -> %q", width, w, p)
+			}
+		}
 	}
 }
 

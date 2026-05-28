@@ -240,7 +240,7 @@ func (m Model) renderCommentsHeader() string {
 
 func (m Model) renderCommentsStatusbar() string {
 	return ui.StyleStatusBar.Width(m.Width).Render(
-		"j/k scroll  ctrl+d/u página  backspace voltar  q sair",
+		"j/k scroll  tab/shift+tab comentário  c colapsar  ctrl+d/u página  backspace voltar  q sair",
 	)
 }
 
@@ -319,17 +319,31 @@ func newDescriptionRenderer(wrap int) *glamour.TermRenderer {
 	return r
 }
 
-func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, diffs []gitlab.FileDiff, width int) string {
-	parentContent := max(width-boxChrome, 16)
+// buildRenderedDiscussions renderiza todos os comentários e notas de sistema.
+// selectedComment é o índice (base-0) do comentário de usuário selecionado,
+// ou -1 para nenhum. collapsed mapeia índices de comentários colapsados.
+// Retorna o conteúdo renderizado e os offsets em linhas de cada comentário
+// de usuário dentro do conteúdo (para scroll por Tab).
+func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, diffs []gitlab.FileDiff, width int, selectedComment int, collapsed map[int]bool) (string, []int) {
+	// O gutter de 2 colunas ("> " / "  ") é reservado antes do box raiz.
+	const cursorGutter = 2
+	parentContent := max(width-boxChrome-cursorGutter, 14)
 	replyContent := max(width-replyIndent-boxChrome, 12)
 	descRenderer := newDescriptionRenderer(parentContent)
 	parentRenderer := newCommentRenderer(parentContent, string(ui.ColorBg))
 	replyRenderer := newCommentRenderer(replyContent, string(ui.ColorBg1))
 
 	var sb strings.Builder
+	var offsets []int
+	lineCount := 0
+
+	addStr := func(s string) {
+		sb.WriteString(s)
+		lineCount += strings.Count(s, "\n")
+	}
 
 	if mr != nil && strings.TrimSpace(mr.Description) != "" {
-		sb.WriteString(renderMRDescription(mr, descRenderer, parentContent))
+		addStr(renderMRDescription(mr, descRenderer, parentContent))
 	}
 
 	var userDiscussions []gitlab.Discussion
@@ -344,28 +358,30 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 
 	if len(userDiscussions) > 0 {
 		divLen := max(width-22, 4)
-		sb.WriteString(ui.StyleSectionDivider.Render(
+		addStr(ui.StyleSectionDivider.Render(
 			"\n── Comentários " + strings.Repeat("─", divLen),
 		))
-		sb.WriteString("\n\n")
+		addStr("\n\n")
 	}
 
 	for i, d := range userDiscussions {
 		if i > 0 {
-			sb.WriteString("\n")
+			addStr("\n")
 		}
-		sb.WriteString(renderDiscussion(d, diffs, parentRenderer, replyRenderer, parentContent, replyContent))
+		offsets = append(offsets, lineCount)
+		addStr(renderDiscussion(d, diffs, parentRenderer, replyRenderer, parentContent, replyContent, i == selectedComment, collapsed[i]))
 	}
+
 	if len(systemNotes) > 0 {
 		divLen := max(width-26, 4)
-		sb.WriteString(ui.StyleSectionDivider.Render(
+		addStr(ui.StyleSectionDivider.Render(
 			"\n── Atividade do sistema " + strings.Repeat("─", divLen) + "\n",
 		))
 		for _, n := range systemNotes {
-			sb.WriteString(renderSystemNote(n, width))
+			addStr(renderSystemNote(n, width))
 		}
 	}
-	return sb.String()
+	return sb.String(), offsets
 }
 
 func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer, codeWidth int) string {
@@ -376,7 +392,10 @@ func renderMRDescription(mr *gitlab.MergeRequest, r *glamour.TermRenderer, codeW
 	return "\n\n" + indentLines(content, 2) + "\n"
 }
 
-func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int) string {
+func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRenderer, replyRenderer *glamour.TermRenderer, parentContent, replyContent int, selected, collapsed bool) string {
+	if collapsed {
+		return renderCollapsedDiscussion(d, parentContent, selected)
+	}
 	var sb strings.Builder
 	isFirst := true
 	for _, note := range d.Notes {
@@ -403,7 +422,7 @@ func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRender
 			}
 
 			box := ui.StyleCommentBox.Width(parentContent + 2).Render(inner)
-			sb.WriteString(box + "\n")
+			sb.WriteString(applyCommentCursor(box, selected) + "\n")
 		} else {
 			header := ui.StyleReplyArrow.Render("↳ ") +
 				ui.StyleReplyAuthor.Render("@"+note.Author) +
@@ -415,6 +434,58 @@ func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRender
 		}
 	}
 	return sb.String()
+}
+
+// renderCollapsedDiscussion renderiza uma linha compacta para um comentário
+// colapsado: apenas cabeçalho (autor, tempo, badge) e contagem de notas.
+func renderCollapsedDiscussion(d gitlab.Discussion, parentContent int, selected bool) string {
+	var first *gitlab.Note
+	noteCount := 0
+	for i := range d.Notes {
+		if d.Notes[i].System {
+			continue
+		}
+		if first == nil {
+			first = &d.Notes[i]
+		}
+		noteCount++
+	}
+	if first == nil {
+		return ""
+	}
+
+	header := ui.StyleCommentAuthor.Render("@"+first.Author) +
+		ui.StyleMetaOnComment.Render("  •  "+renderAge(first.CreatedAt))
+	if first.Resolvable && first.Resolved {
+		header += ui.StyleMetaOnComment.Render("  ") +
+			ui.StyleResolvedBadgeOnComment.Render("[✓ resolvido]")
+	}
+	noun := "nota"
+	if noteCount != 1 {
+		noun = "notas"
+	}
+	header += ui.StyleMetaOnComment.Render(fmt.Sprintf("  ▸ %d %s", noteCount, noun))
+
+	box := ui.StyleCommentBox.Width(parentContent + 2).Render(header)
+	return applyCommentCursor(box, selected) + "\n"
+}
+
+// applyCommentCursor prefixa o box do comentário raiz com "> " (selecionado)
+// ou "  " (não selecionado) na primeira linha e "  " nas demais.
+func applyCommentCursor(box string, selected bool) string {
+	lines := strings.Split(box, "\n")
+	firstPrefix := "  "
+	if selected {
+		firstPrefix = ui.StyleCursor.Render(">") + " "
+	}
+	for i, line := range lines {
+		if i == 0 {
+			lines[i] = firstPrefix + line
+		} else if line != "" {
+			lines[i] = "  " + line
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // renderDiffContext retorna o bloco de diff com syntax highlighting e
