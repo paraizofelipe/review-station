@@ -47,7 +47,7 @@ func TestBoxRenderDump(t *testing.T) {
 	// Dump legível (ANSI removido) para inspeção visual da estrutura.
 	t.Log("\n" + ansiRe.ReplaceAllString(out, ""))
 
-	// Toda linha de borda deve ter a mesma largura visível (caixas fechadas).
+	// Linhas de borda (com ◯/◉/│ no gutter) não devem exceder o width.
 	for _, line := range strings.Split(out, "\n") {
 		plain := ansiRe.ReplaceAllString(line, "")
 		if strings.ContainsAny(plain, "╭╰") {
@@ -56,6 +56,11 @@ func TestBoxRenderDump(t *testing.T) {
 				t.Errorf("linha de borda excede largura %d: %d -> %q", width, w, plain)
 			}
 		}
+	}
+
+	// Marcadores de timeline devem aparecer no output.
+	if !strings.Contains(ansiRe.ReplaceAllString(out, ""), "◯") {
+		t.Error("esperava marcador ◯ no output")
 	}
 
 	// O fundo dos comment boxes (#282828) deve aparecer no output.

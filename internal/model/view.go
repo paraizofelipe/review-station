@@ -426,10 +426,9 @@ func newDescriptionRenderer(wrap int) *glamour.TermRenderer {
 // Retorna o conteúdo renderizado e os offsets em linhas de cada comentário
 // de usuário dentro do conteúdo (para scroll por Tab).
 func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Discussion, diffs []gitlab.FileDiff, width int, selectedComment int, collapsed map[int]bool) (string, []int) {
-	// O gutter de 2 colunas ("> " / "  ") é reservado antes do box raiz.
+	// Gutter de 2 colunas (◯/◉/│ + espaço) reservado à esquerda das caixas.
 	const cursorGutter = 2
 	parentContent := max(width-boxChrome-cursorGutter, 14)
-	// Respostas usam a mesma largura de caixa; os conectores ├─/└─ ocupam o gutter.
 	descRenderer := newDescriptionRenderer(parentContent)
 	parentRenderer := newCommentRenderer(parentContent, string(ui.ColorBg))
 	replyRenderer := newCommentRenderer(parentContent, string(ui.ColorBg1))
@@ -467,7 +466,7 @@ func buildRenderedDiscussions(mr *gitlab.MergeRequest, discussions []gitlab.Disc
 
 	for i, d := range userDiscussions {
 		if i > 0 {
-			addStr("\n")
+			addStr(ui.StyleTimeline.Render("│") + "\n")
 		}
 		offsets = append(offsets, lineCount)
 		addStr(renderDiscussion(d, diffs, parentRenderer, replyRenderer, parentContent, i == selectedComment, collapsed[i]))
@@ -497,54 +496,43 @@ func renderDiscussion(d gitlab.Discussion, diffs []gitlab.FileDiff, parentRender
 	if collapsed {
 		return renderCollapsedDiscussion(d, parentContent, selected)
 	}
+	var sb strings.Builder
+	isFirst := true
+	for _, note := range d.Notes {
+		if note.System {
+			continue
+		}
+		if isFirst {
+			isFirst = false
+			header := ui.StyleCommentAuthor.Render("@"+note.Author) +
+				ui.StyleMetaOnComment.Render("  •  "+renderAge(note.CreatedAt))
+			if note.Resolvable && note.Resolved {
+				header += ui.StyleMetaOnComment.Render("  ") +
+					ui.StyleResolvedBadgeOnComment.Render("[✓ resolvido]")
+			}
+			divider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
+			body := strings.Trim(renderMarkdownPadded(parentRenderer, note.Body, parentContent), "\n")
 
-	var userNotes []gitlab.Note
-	for _, n := range d.Notes {
-		if !n.System {
-			userNotes = append(userNotes, n)
+			var inner string
+			if ctx := renderDiffContext(note.Position, diffs, parentContent); ctx != "" {
+				ctxDivider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
+				inner = ctx + "\n" + ctxDivider + "\n" + header + "\n" + divider + "\n" + body
+			} else {
+				inner = header + "\n" + divider + "\n" + body
+			}
+
+			box := ui.StyleCommentBox.Width(parentContent + 2).Render(inner)
+			sb.WriteString(applyCommentCursor(box, selected) + "\n")
+		} else {
+			header := ui.StyleReplyArrow.Render("↳ ") +
+				ui.StyleReplyAuthor.Render("@"+note.Author) +
+				ui.StyleMetaOnReply.Render("  •  "+renderAge(note.CreatedAt))
+			body := strings.Trim(renderMarkdownPadded(replyRenderer, note.Body, parentContent), "\n")
+			inner := header + "\n" + body
+			box := ui.StyleReplyBox.Width(parentContent + 2).Render(inner)
+			sb.WriteString(applyReplyConnector(box) + "\n")
 		}
 	}
-	if len(userNotes) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-
-	// Comentário raiz (primeira note do usuário).
-	note := userNotes[0]
-	header := ui.StyleCommentAuthor.Render("@"+note.Author) +
-		ui.StyleMetaOnComment.Render("  •  "+renderAge(note.CreatedAt))
-	if note.Resolvable && note.Resolved {
-		header += ui.StyleMetaOnComment.Render("  ") +
-			ui.StyleResolvedBadgeOnComment.Render("[✓ resolvido]")
-	}
-	divider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
-	body := strings.Trim(renderMarkdownPadded(parentRenderer, note.Body, parentContent), "\n")
-
-	var inner string
-	if ctx := renderDiffContext(note.Position, diffs, parentContent); ctx != "" {
-		ctxDivider := ui.StyleCommentDivider.Render(strings.Repeat("─", parentContent))
-		inner = ctx + "\n" + ctxDivider + "\n" + header + "\n" + divider + "\n" + body
-	} else {
-		inner = header + "\n" + divider + "\n" + body
-	}
-
-	box := ui.StyleCommentBox.Width(parentContent + 2).Render(inner)
-	sb.WriteString(applyCommentCursor(box, selected) + "\n")
-
-	// Respostas: conectores de árvore ├─ (não-última) ou └─ (última).
-	replies := userNotes[1:]
-	for i, reply := range replies {
-		isLast := i == len(replies)-1
-		rHeader := ui.StyleReplyArrow.Render("↳ ") +
-			ui.StyleReplyAuthor.Render("@"+reply.Author) +
-			ui.StyleMetaOnReply.Render("  •  "+renderAge(reply.CreatedAt))
-		rBody := strings.Trim(renderMarkdownPadded(replyRenderer, reply.Body, parentContent), "\n")
-		rInner := rHeader + "\n" + rBody
-		rBox := ui.StyleReplyBox.Width(parentContent + 2).Render(rInner)
-		sb.WriteString(applyReplyConnector(rBox, isLast) + "\n")
-	}
-
 	return sb.String()
 }
 
@@ -582,13 +570,13 @@ func renderCollapsedDiscussion(d gitlab.Discussion, parentContent int, selected 
 	return applyCommentCursor(box, selected) + "\n"
 }
 
-// applyCommentCursor prefixa o box do comentário raiz com a barra de timeline
-// "│ " em todas as linhas; a primeira linha usa "> " quando selecionado.
+// applyCommentCursor prefixa cada linha do box pai com o gutter de timeline:
+// primeira linha usa ◯ (não selecionado) ou ◉ (selecionado); demais usam │.
 func applyCommentCursor(box string, selected bool) string {
 	bar := ui.StyleTimeline.Render("│") + " "
-	firstPrefix := bar
+	firstPrefix := ui.StyleTimeline.Render("◯") + " "
 	if selected {
-		firstPrefix = ui.StyleCursor.Render(">") + " "
+		firstPrefix = ui.StyleCursor.Render("◉") + " "
 	}
 	lines := strings.Split(box, "\n")
 	for i, line := range lines {
@@ -601,23 +589,14 @@ func applyCommentCursor(box string, selected bool) string {
 	return strings.Join(lines, "\n")
 }
 
-// applyReplyConnector prefixa o box de resposta com o conector de árvore:
-// "├─" (não-última resposta) ou "└─" (última), com continuação "│ " ou "  ".
-func applyReplyConnector(box string, isLast bool) string {
-	var firstPrefix, contPrefix string
-	if isLast {
-		firstPrefix = ui.StyleTimeline.Render("└─")
-		contPrefix = "  "
-	} else {
-		firstPrefix = ui.StyleTimeline.Render("├─")
-		contPrefix = ui.StyleTimeline.Render("│") + " "
-	}
+// applyReplyConnector prefixa o box de resposta com "│ " no gutter,
+// mantendo visualmente a continuidade da thread.
+func applyReplyConnector(box string) string {
+	bar := ui.StyleTimeline.Render("│") + " "
 	lines := strings.Split(box, "\n")
 	for i, line := range lines {
-		if i == 0 {
-			lines[i] = firstPrefix + line
-		} else if line != "" {
-			lines[i] = contPrefix + line
+		if line != "" {
+			lines[i] = bar + line
 		}
 	}
 	return strings.Join(lines, "\n")
