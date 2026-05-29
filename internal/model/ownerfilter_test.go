@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -162,5 +163,46 @@ func TestUpdateOwnerFilter_escClearsFilter(t *testing.T) {
 	}
 	if result.OwnerFilter != "" {
 		t.Errorf("Esc deveria limpar o OwnerFilter, got %q", result.OwnerFilter)
+	}
+}
+
+func TestUpdateListCKeyClearsAppliedFiltersAndReloadsAllMRs(t *testing.T) {
+	m := makeTestModel()
+	m.Config.Repos = []config.Repo{{Path: "org/project"}}
+	m.Filter = FilterClosed
+	m.OwnerFilter = "paraizo"
+	m.ProjectFilter = "org/project"
+	m.Items = makeItemsWithAuthors()
+	m.Projects = []ProjectGroup{{Repo: m.Config.Repos[0], MRs: []gitlab.MergeRequest{{IID: 1, Author: "paraizo"}}}}
+	m.Cursor = 2
+	m.Loading = map[string]bool{"org/project": false}
+	m.Errors = map[string]error{"org/project": errors.New("erro antigo")}
+
+	got, cmd := m.updateList(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	result := got.(Model)
+
+	if result.Filter != FilterAll {
+		t.Fatalf("pressionar c deveria limpar filtro de status para all, got %q", result.Filter)
+	}
+	if result.OwnerFilter != "" {
+		t.Fatalf("pressionar c deveria limpar OwnerFilter, got %q", result.OwnerFilter)
+	}
+	if result.ProjectFilter != "" {
+		t.Fatalf("pressionar c deveria limpar ProjectFilter, got %q", result.ProjectFilter)
+	}
+	if result.Cursor != 0 {
+		t.Fatalf("cursor deveria voltar para 0 depois de limpar filtros, got %d", result.Cursor)
+	}
+	if len(result.Items) != 0 || len(result.Projects) != 0 {
+		t.Fatalf("limpar filtros deveria descartar MRs filtrados antes do reload, items=%d projects=%d", len(result.Items), len(result.Projects))
+	}
+	if !result.Loading["org/project"] {
+		t.Fatalf("limpar filtro de status deveria recarregar todos os MRs")
+	}
+	if _, ok := result.Errors["org/project"]; ok {
+		t.Fatalf("erros antigos deveriam ser limpos ao recarregar")
+	}
+	if cmd == nil {
+		t.Fatalf("limpar filtros deveria disparar reload com filtro all")
 	}
 }

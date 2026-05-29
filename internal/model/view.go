@@ -108,7 +108,7 @@ func (m Model) renderStatusbar() string {
 		if m.ProjectFilter != "" {
 			filters += "  projeto:" + projectDisplayNameByPath(m.projectFilterOptions(), m.ProjectFilter)
 		}
-		return m.renderKeyBar("j/k navegar  enter abrir  f+s status  f+o owner  f+p projeto" + filters + "  r atualizar  q/ctrl+c sair")
+		return m.renderKeyBar("j/k nav enter abrir f+s status f+o owner f+p proj" + filters + " c limpar r recar q/ctrl+c")
 	}
 }
 

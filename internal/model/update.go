@@ -212,6 +212,22 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f":
 		m.FilterChordPending = true
 
+	case "c":
+		m.Filter = FilterAll
+		m.OwnerFilter = ""
+		m.ProjectFilter = ""
+		m.OwnerFilterInput.Reset()
+		m.ProjectFilterMenu.Selected = 0
+		for _, repo := range m.Config.Repos {
+			m.Loading[repo.Path] = true
+			delete(m.Errors, repo.Path)
+		}
+		m.Projects = nil
+		m.Items = nil
+		m.Cursor = 0
+		m.Viewport.YOffset = 0
+		return m, m.Init()
+
 	case "r":
 		for _, repo := range m.Config.Repos {
 			m.Loading[repo.Path] = true
