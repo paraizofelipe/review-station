@@ -28,7 +28,7 @@ func TestListStatusbarShowsAllCurrentScreenBindKeys(t *testing.T) {
 	m := Model{Width: 120}
 	got := stripANSI(m.renderStatusbar())
 
-	for _, want := range []string{"j/k", "enter", "f+s", "f+o", "r", "q", "ctrl+c"} {
+	for _, want := range []string{"j/k", "enter", "f+s", "f+o", "f+p", "r", "q", "ctrl+c"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("renderStatusbar() deveria conter %q; got %q", want, got)
 		}
@@ -52,7 +52,7 @@ func TestListViewShowsBindKeyFooterOnItsOwnBottomLine(t *testing.T) {
 	}
 
 	footer := lines[len(lines)-1]
-	for _, want := range []string{"j/k", "enter", "f+s", "f+o", "r", "q"} {
+	for _, want := range []string{"j/k", "enter", "f+s", "f+o", "f+p", "r", "q"} {
 		if !strings.Contains(footer, want) {
 			t.Fatalf("rodape deveria ficar na ultima linha e conter %q; footer %q; view %q", want, footer, got)
 		}

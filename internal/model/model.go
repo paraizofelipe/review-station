@@ -32,7 +32,7 @@ const (
 type Screen int
 
 const (
-	ScreenList     Screen = iota
+	ScreenList Screen = iota
 	ScreenComments
 	ScreenReply
 )
@@ -54,33 +54,41 @@ type FilterMenu struct {
 	Selected int
 }
 
+type ProjectFilterMenu struct {
+	Options  []config.Repo
+	Selected int
+}
+
 type Model struct {
-	Config           config.Config
-	Client           gitlab.Client
-	Projects         []ProjectGroup
-	Loading          map[string]bool
-	Errors           map[string]error
-	Cursor           int
-	Items            []ListItem
-	Filter           FilterState
-	ShowFilter       bool
-	FilterMenu       FilterMenu
+	Config              config.Config
+	Client              gitlab.Client
+	Projects            []ProjectGroup
+	Loading             map[string]bool
+	Errors              map[string]error
+	Cursor              int
+	Items               []ListItem
+	Filter              FilterState
+	ShowFilter          bool
+	FilterMenu          FilterMenu
 	FilterChordPending  bool
 	ShowOwnerFilter     bool
 	OwnerFilter         string
 	OwnerFilterInput    textinput.Model
-	Viewport         viewport.Model
-	Width            int
-	Height           int
-	Ready            bool
-	Screen           Screen
-	ActiveMR         *gitlab.MergeRequest
-	ActiveRepo       config.Repo
-	Discussions      []gitlab.Discussion
-	Diffs            []gitlab.FileDiff
-	CommentsLoading  bool
-	CommentsError    error
-	DiffsLoading     bool
+	ShowProjectFilter   bool
+	ProjectFilter       string
+	ProjectFilterMenu   ProjectFilterMenu
+	Viewport            viewport.Model
+	Width               int
+	Height              int
+	Ready               bool
+	Screen              Screen
+	ActiveMR            *gitlab.MergeRequest
+	ActiveRepo          config.Repo
+	Discussions         []gitlab.Discussion
+	Diffs               []gitlab.FileDiff
+	CommentsLoading     bool
+	CommentsError       error
+	DiffsLoading        bool
 	RenderedDiscussions string
 	CommentCursor       int
 	CommentOffsets      []int
@@ -143,6 +151,7 @@ func New(cfg config.Config, client gitlab.Client) Model {
 		FilterMenu: FilterMenu{
 			Options: []FilterState{FilterOpened, FilterClosed, FilterMerged, FilterAll},
 		},
+		ProjectFilterMenu: ProjectFilterMenu{Options: cfg.Repos},
 	}
 }
 
@@ -238,3 +247,20 @@ func filterItemsByOwner(items []ListItem, substr string) []ListItem {
 	return result
 }
 
+func filterItemsByProject(items []ListItem, projectPath string) []ListItem {
+	if projectPath == "" {
+		return items
+	}
+	result := make([]ListItem, 0, len(items))
+	for _, item := range items {
+		if item.Repo.Path == projectPath {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func (m Model) visibleItems() []ListItem {
+	items := filterItemsByProject(m.Items, m.ProjectFilter)
+	return filterItemsByOwner(items, m.OwnerFilter)
+}

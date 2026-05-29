@@ -132,6 +132,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.ShowOwnerFilter {
 			return m.updateOwnerFilter(msg)
 		}
+		if m.ShowProjectFilter {
+			return m.updateProjectFilter(msg)
+		}
 		if m.ShowFilter {
 			return m.updateFilter(msg)
 		}
@@ -156,7 +159,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	items := filterItemsByOwner(m.Items, m.OwnerFilter)
+	items := m.visibleItems()
 
 	switch msg.String() {
 	case "q", "ctrl+c":
@@ -230,8 +233,42 @@ func (m Model) updateFilterChord(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ShowOwnerFilter = true
 		m.OwnerFilterInput.SetValue(m.OwnerFilter)
 		return m, m.OwnerFilterInput.Focus()
+	case "p":
+		m.ShowProjectFilter = true
+		m.ProjectFilterMenu.Options = m.projectFilterOptions()
+		m.ProjectFilterMenu.Selected = m.selectedProjectFilterIndex()
 	case "s", "f":
 		m.ShowFilter = true
+	}
+	return m, nil
+}
+
+func (m Model) updateProjectFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if len(m.ProjectFilterMenu.Options) == 0 {
+		m.ProjectFilterMenu.Options = m.projectFilterOptions()
+	}
+	switch msg.String() {
+	case "j", "down":
+		if m.ProjectFilterMenu.Selected < len(m.ProjectFilterMenu.Options)-1 {
+			m.ProjectFilterMenu.Selected++
+		}
+	case "k", "up":
+		if m.ProjectFilterMenu.Selected > 0 {
+			m.ProjectFilterMenu.Selected--
+		}
+	case "enter":
+		if len(m.ProjectFilterMenu.Options) > 0 {
+			m.ProjectFilter = m.ProjectFilterMenu.Options[m.ProjectFilterMenu.Selected].Path
+		}
+		m.ShowProjectFilter = false
+		m.Cursor = 0
+		return m, nil
+	case "esc":
+		m.ProjectFilter = ""
+		m.ShowProjectFilter = false
+		m.ProjectFilterMenu.Selected = 0
+		m.Cursor = 0
+		return m, nil
 	}
 	return m, nil
 }

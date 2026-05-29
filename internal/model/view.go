@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	xansi "github.com/charmbracelet/x/ansi"
 
+	"paraizofelipe/review-station/internal/config"
 	"paraizofelipe/review-station/internal/gitlab"
 	"paraizofelipe/review-station/internal/ui"
 )
@@ -40,6 +41,11 @@ func (m Model) View() string {
 
 	if m.ShowOwnerFilter {
 		filterArea := m.renderOwnerFilterOverlay()
+		return header + "\n" + filterArea + "\n" + statusbar
+	}
+
+	if m.ShowProjectFilter {
+		filterArea := m.renderProjectFilterOverlay()
 		return header + "\n" + filterArea + "\n" + statusbar
 	}
 
@@ -89,15 +95,20 @@ func (m Model) renderStatusbar() string {
 	case m.ShowFilter:
 		return m.renderKeyBar("j/k ou ↑/↓ navegar opções  enter aplicar  esc ou f fechar")
 	case m.FilterChordPending:
-		return m.renderKeyBar("f+s ou f+f filtrar status  f+o filtrar owner  esc cancelar")
+		return m.renderKeyBar("f+s ou f+f filtrar status  f+o filtrar owner  f+p filtrar projeto  esc cancelar")
 	case m.ShowOwnerFilter:
 		return m.renderKeyBar("digite owner  enter aplicar filtro  esc limpar e fechar")
+	case m.ShowProjectFilter:
+		return m.renderKeyBar("j/k ou ↑/↓ selecionar projeto  enter aplicar filtro  esc limpar e fechar")
 	default:
-		owner := ""
+		filters := ""
 		if m.OwnerFilter != "" {
-			owner = "  filtro atual: @" + m.OwnerFilter
+			filters += "  owner:@" + m.OwnerFilter
 		}
-		return m.renderKeyBar("j/k ou ↑/↓ navegar  enter abrir MR  f+s status  f+o owner" + owner + "  r atualizar  q ou ctrl+c sair")
+		if m.ProjectFilter != "" {
+			filters += "  projeto:" + projectDisplayNameByPath(m.projectFilterOptions(), m.ProjectFilter)
+		}
+		return m.renderKeyBar("j/k navegar  enter abrir  f+s status  f+o owner  f+p projeto" + filters + "  r atualizar  q/ctrl+c sair")
 	}
 }
 
@@ -109,7 +120,7 @@ func (m Model) renderList() string {
 		return "\n  Nenhum MR encontrado."
 	}
 
-	visible := filterItemsByOwner(m.Items, m.OwnerFilter)
+	visible := m.visibleItems()
 
 	hasMR := false
 	for _, item := range visible {
@@ -118,8 +129,8 @@ func (m Model) renderList() string {
 			break
 		}
 	}
-	if !hasMR && m.OwnerFilter != "" {
-		return "\n  Nenhum MR de @" + m.OwnerFilter + "."
+	if !hasMR && (m.OwnerFilter != "" || m.ProjectFilter != "") {
+		return "\n  Nenhum MR encontrado para os filtros atuais."
 	}
 
 	var sb strings.Builder
@@ -253,6 +264,84 @@ func (m Model) renderOwnerFilterOverlay() string {
 		lipgloss.Center, lipgloss.Center,
 		box,
 	)
+}
+
+func (m Model) renderProjectFilterOverlay() string {
+	options := m.ProjectFilterMenu.Options
+	if len(options) == 0 {
+		options = m.projectFilterOptions()
+	}
+	var inner strings.Builder
+	inner.WriteString("── Filtrar por projeto ──\n")
+	if len(options) == 0 {
+		inner.WriteString(ui.StylePopoverItem.Render("  Nenhum projeto configurado"))
+	} else {
+		for i, repo := range options {
+			label := projectDisplayName(repo)
+			if repo.Path != "" && repo.Path != label {
+				label += "  " + ui.StyleMeta.Render(repo.Path)
+			}
+			if i == m.ProjectFilterMenu.Selected {
+				inner.WriteString(ui.StylePopoverSelected.Render("> " + label))
+			} else {
+				inner.WriteString(ui.StylePopoverItem.Render("  " + label))
+			}
+			inner.WriteString("\n")
+		}
+	}
+
+	box := ui.StylePopoverBorder.Render(strings.TrimRight(inner.String(), "\n"))
+	return lipgloss.Place(
+		m.Width, m.Viewport.Height,
+		lipgloss.Center, lipgloss.Center,
+		box,
+	)
+}
+
+func (m Model) projectFilterOptions() []config.Repo {
+	if len(m.Config.Repos) > 0 {
+		return m.Config.Repos
+	}
+	options := make([]config.Repo, 0, len(m.Projects))
+	seen := make(map[string]bool, len(m.Projects))
+	for _, project := range m.Projects {
+		if project.Repo.Path == "" || seen[project.Repo.Path] {
+			continue
+		}
+		options = append(options, project.Repo)
+		seen[project.Repo.Path] = true
+	}
+	return options
+}
+
+func (m Model) selectedProjectFilterIndex() int {
+	options := m.projectFilterOptions()
+	for i, repo := range options {
+		if repo.Path == m.ProjectFilter {
+			return i
+		}
+	}
+	return 0
+}
+
+func projectDisplayName(repo config.Repo) string {
+	if repo.Name != "" {
+		return repo.Name
+	}
+	parts := strings.Split(repo.Path, "/")
+	if len(parts) > 0 && parts[len(parts)-1] != "" {
+		return parts[len(parts)-1]
+	}
+	return repo.Path
+}
+
+func projectDisplayNameByPath(options []config.Repo, path string) string {
+	for _, repo := range options {
+		if repo.Path == path {
+			return projectDisplayName(repo)
+		}
+	}
+	return path
 }
 
 func (m Model) renderCommentsView() string {
