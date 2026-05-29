@@ -127,6 +127,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Screen == ScreenComments {
 			return m.updateComments(msg)
 		}
+		if m.FilterChordPending {
+			return m.updateFilterChord(msg)
+		}
+		if m.ShowOwnerFilter {
+			return m.updateOwnerFilter(msg)
+		}
 		if m.ShowFilter {
 			return m.updateFilter(msg)
 		}
@@ -141,27 +147,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	if m.ShowOwnerFilter {
+		var cmd tea.Cmd
+		m.OwnerFilterInput, cmd = m.OwnerFilterInput.Update(msg)
+		return m, cmd
+	}
+
 	return m, nil
 }
 
 func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	items := filterItemsByOwner(m.Items, m.OwnerFilter)
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 
 	case "j", "down":
 		next := m.Cursor + 1
-		for next < len(m.Items) && m.Items[next].Kind == ItemHeader {
+		for next < len(items) && items[next].Kind == ItemHeader {
 			next++
 		}
-		if next < len(m.Items) {
+		if next < len(items) {
 			m.Cursor = next
 			m.syncViewport()
 		}
 
 	case "k", "up":
 		prev := m.Cursor - 1
-		for prev >= 0 && m.Items[prev].Kind == ItemHeader {
+		for prev >= 0 && items[prev].Kind == ItemHeader {
 			prev--
 		}
 		if prev >= 0 {
@@ -170,8 +184,8 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "enter":
-		if m.Cursor >= 0 && m.Cursor < len(m.Items) && m.Items[m.Cursor].Kind == ItemMR {
-			item := m.Items[m.Cursor]
+		if m.Cursor >= 0 && m.Cursor < len(items) && items[m.Cursor].Kind == ItemMR {
+			item := items[m.Cursor]
 			m.fetchToken++
 			m.Screen = ScreenComments
 			m.ActiveMR = item.MR
@@ -194,7 +208,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "f":
-		m.ShowFilter = true
+		m.FilterChordPending = true
 
 	case "r":
 		for _, repo := range m.Config.Repos {
@@ -208,6 +222,40 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) updateFilterChord(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.FilterChordPending = false
+	switch msg.String() {
+	case "o":
+		m.ShowOwnerFilter = true
+		m.OwnerFilterInput.SetValue(m.OwnerFilter)
+		return m, m.OwnerFilterInput.Focus()
+	case "s", "f":
+		m.ShowFilter = true
+	}
+	return m, nil
+}
+
+func (m Model) updateOwnerFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		m.OwnerFilter = m.OwnerFilterInput.Value()
+		m.ShowOwnerFilter = false
+		m.OwnerFilterInput.Blur()
+		m.Cursor = 0
+		return m, nil
+	case "esc":
+		m.OwnerFilter = ""
+		m.ShowOwnerFilter = false
+		m.OwnerFilterInput.Reset()
+		m.OwnerFilterInput.Blur()
+		m.Cursor = 0
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.OwnerFilterInput, cmd = m.OwnerFilterInput.Update(msg)
+	return m, cmd
 }
 
 func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

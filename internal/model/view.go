@@ -37,6 +37,11 @@ func (m Model) View() string {
 		return header + "\n" + filterArea + statusbar
 	}
 
+	if m.ShowOwnerFilter {
+		filterArea := m.renderOwnerFilterOverlay()
+		return header + "\n" + filterArea + statusbar
+	}
+
 	listContent := m.renderList()
 	m.Viewport.SetContent(listContent)
 
@@ -71,10 +76,19 @@ func (m Model) renderTitleBar() string {
 
 func (m Model) renderStatusbar() string {
 	var keys string
-	if m.ShowFilter {
+	switch {
+	case m.ShowFilter:
 		keys = "j/k navegar opções  Enter aplicar  Esc fechar"
-	} else {
-		keys = "j/k navegar  f filtrar  r atualizar  q sair"
+	case m.FilterChordPending:
+		keys = "f: [s]tatus  [o]wner  Esc cancelar"
+	case m.ShowOwnerFilter:
+		keys = "Enter confirmar  Esc limpar e fechar"
+	default:
+		base := "j/k navegar  f filtrar  r atualizar  q sair"
+		if m.OwnerFilter != "" {
+			base = "j/k navegar  f filtrar  [@" + m.OwnerFilter + "]  r atualizar  q sair"
+		}
+		keys = base
 	}
 	return ui.StyleStatusBar.Width(m.Width).Render(keys)
 }
@@ -87,8 +101,21 @@ func (m Model) renderList() string {
 		return "\n  Nenhum MR encontrado."
 	}
 
+	visible := filterItemsByOwner(m.Items, m.OwnerFilter)
+
+	hasMR := false
+	for _, item := range visible {
+		if item.Kind == ItemMR {
+			hasMR = true
+			break
+		}
+	}
+	if !hasMR && m.OwnerFilter != "" {
+		return "\n  Nenhum MR de @" + m.OwnerFilter + "."
+	}
+
 	var sb strings.Builder
-	for i, item := range m.Items {
+	for i, item := range visible {
 		switch item.Kind {
 		case ItemHeader:
 			sb.WriteString(renderProjectHeader(item))
@@ -201,6 +228,18 @@ func (m Model) renderFilterOverlay() string {
 
 	box := ui.StylePopoverBorder.Render(strings.TrimRight(inner.String(), "\n"))
 
+	return lipgloss.Place(
+		m.Width, m.Viewport.Height,
+		lipgloss.Center, lipgloss.Center,
+		box,
+	)
+}
+
+func (m Model) renderOwnerFilterOverlay() string {
+	label := ui.StylePopoverItem.Render("Owner: ")
+	input := m.OwnerFilterInput.View()
+	inner := "── Filtrar por owner ──\n" + label + input
+	box := ui.StylePopoverBorder.Render(inner)
 	return lipgloss.Place(
 		m.Width, m.Viewport.Height,
 		lipgloss.Center, lipgloss.Center,

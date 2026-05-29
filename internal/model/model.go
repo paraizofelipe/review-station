@@ -2,8 +2,10 @@ package model
 
 import (
 	"context"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -63,6 +65,10 @@ type Model struct {
 	Filter           FilterState
 	ShowFilter       bool
 	FilterMenu       FilterMenu
+	FilterChordPending  bool
+	ShowOwnerFilter     bool
+	OwnerFilter         string
+	OwnerFilterInput    textinput.Model
 	Viewport         viewport.Model
 	Width            int
 	Height           int
@@ -76,9 +82,9 @@ type Model struct {
 	CommentsError    error
 	DiffsLoading     bool
 	RenderedDiscussions string
-	CommentCursor       int          // índice do comentário selecionado (-1 = nenhum)
-	CommentOffsets      []int        // offset em linhas de cada comentário no viewport
-	CollapsedComments   map[int]bool // índices dos comentários colapsados
+	CommentCursor       int
+	CommentOffsets      []int
+	CollapsedComments   map[int]bool
 	ReplyInput          textarea.Model
 	ReplyDiscussionID   string
 	ReplySending        bool
@@ -126,13 +132,14 @@ func New(cfg config.Config, client gitlab.Client) Model {
 		loading[r.Path] = true
 	}
 	return Model{
-		Config:        cfg,
-		Client:        client,
-		Loading:       loading,
-		Errors:        errors,
-		Filter:        FilterOpened,
-		CommentCursor: -1,
-		ReplyInput:    newReplyInput(),
+		Config:           cfg,
+		Client:           client,
+		Loading:          loading,
+		Errors:           errors,
+		Filter:           FilterOpened,
+		CommentCursor:    -1,
+		ReplyInput:       newReplyInput(),
+		OwnerFilterInput: newOwnerFilterInput(),
 		FilterMenu: FilterMenu{
 			Options: []FilterState{FilterOpened, FilterClosed, FilterMerged, FilterAll},
 		},
@@ -204,5 +211,30 @@ func RebuildItems(projects []ProjectGroup) []ListItem {
 
 func newViewport(w, h int) viewport.Model {
 	return viewport.New(w, h)
+}
+
+func newOwnerFilterInput() textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "filtrar por owner..."
+	ti.CharLimit = 64
+	return ti
+}
+
+func filterItemsByOwner(items []ListItem, substr string) []ListItem {
+	if substr == "" {
+		return items
+	}
+	lower := strings.ToLower(substr)
+	result := make([]ListItem, 0, len(items))
+	for _, item := range items {
+		if item.Kind == ItemHeader {
+			result = append(result, item)
+			continue
+		}
+		if item.MR != nil && strings.Contains(strings.ToLower(item.MR.Author), lower) {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
