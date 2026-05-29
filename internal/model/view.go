@@ -74,47 +74,26 @@ func (m Model) renderTitleBar() string {
 	return lipgloss.NewStyle().Width(m.Width).Render(row)
 }
 
-const keyBarHeight = 2
+const keyBarHeight = 1
 
-func (m Model) renderKeyBar(lines []string) string {
-	for len(lines) < keyBarHeight {
-		lines = append(lines, "")
-	}
-	if len(lines) > keyBarHeight {
-		lines = lines[:keyBarHeight]
-	}
-	for i, line := range lines {
-		lines[i] = ui.StyleStatusBar.Width(m.Width).Render(line)
-	}
-	return strings.Join(lines, "\n")
+func (m Model) renderKeyBar(line string) string {
+	return ui.StyleStatusBar.Width(m.Width).Render(line)
 }
 
 func (m Model) renderStatusbar() string {
 	switch {
 	case m.ShowFilter:
-		return m.renderKeyBar([]string{
-			"j/k ou ↑/↓ navegar opções  enter aplicar",
-			"esc ou f fechar sem aplicar",
-		})
+		return m.renderKeyBar("j/k ou ↑/↓ navegar opções  enter aplicar  esc ou f fechar")
 	case m.FilterChordPending:
-		return m.renderKeyBar([]string{
-			"f+s ou f+f filtrar status  f+o filtrar owner",
-			"esc cancelar chord de filtro",
-		})
+		return m.renderKeyBar("f+s ou f+f filtrar status  f+o filtrar owner  esc cancelar")
 	case m.ShowOwnerFilter:
-		return m.renderKeyBar([]string{
-			"digite owner  enter aplicar filtro",
-			"esc limpar filtro e fechar",
-		})
+		return m.renderKeyBar("digite owner  enter aplicar filtro  esc limpar e fechar")
 	default:
 		owner := ""
 		if m.OwnerFilter != "" {
 			owner = "  filtro atual: @" + m.OwnerFilter
 		}
-		return m.renderKeyBar([]string{
-			"j/k ou ↑/↓ navegar  enter abrir MR  f+s status  f+o owner" + owner,
-			"r atualizar  q ou ctrl+c sair",
-		})
+		return m.renderKeyBar("j/k ou ↑/↓ navegar  enter abrir MR  f+s status  f+o owner" + owner + "  r atualizar  q ou ctrl+c sair")
 	}
 }
 
@@ -308,10 +287,7 @@ func (m Model) renderCommentsHeader() string {
 }
 
 func (m Model) renderCommentsStatusbar() string {
-	return m.renderKeyBar([]string{
-		"j/k ou ↑/↓ scroll  ctrl+d/u página  tab/shift+tab comentário",
-		"r responder  c colapsar  backspace ou esc voltar  q ou ctrl+c sair",
-	})
+	return m.renderKeyBar("j/k ou ↑/↓ scroll  ctrl+d/u página  tab/shift+tab comentário  r responder  c colapsar  backspace ou esc voltar  q ou ctrl+c sair")
 }
 
 // replyTextareaHeight returns the inner content line count for the reply
@@ -387,21 +363,12 @@ func (m Model) renderReplyHeader() string {
 
 func (m Model) renderReplyStatusbar() string {
 	if m.ReplySending {
-		return m.renderKeyBar([]string{
-			ui.StyleMeta.Render("[enviando...]"),
-			"esc cancelar",
-		})
+		return m.renderKeyBar(ui.StyleMeta.Render("[enviando...]") + "  esc cancelar")
 	}
 	if m.ReplyError != nil {
-		return m.renderKeyBar([]string{
-			ui.StyleError.Render("Erro: " + m.ReplyError.Error()),
-			"ctrl+s tentar enviar novamente  esc cancelar",
-		})
+		return m.renderKeyBar(ui.StyleError.Render("Erro: "+m.ReplyError.Error()) + "  ctrl+s tentar enviar novamente  esc cancelar")
 	}
-	return m.renderKeyBar([]string{
-		"digite/edite resposta no textarea",
-		"ctrl+s enviar  esc cancelar",
-	})
+	return m.renderKeyBar("digite/edite resposta no textarea  ctrl+s enviar  esc cancelar")
 }
 
 // newReplyInput cria e estiliza o textarea de resposta.
