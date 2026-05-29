@@ -35,6 +35,30 @@ func TestListStatusbarShowsAllCurrentScreenBindKeys(t *testing.T) {
 	}
 }
 
+func TestListViewShowsBindKeyFooterOnItsOwnBottomLine(t *testing.T) {
+	m := Model{
+		Ready:    true,
+		Width:    80,
+		Height:   10,
+		Viewport: newViewport(80, 7),
+		Loading:  map[string]bool{},
+		Errors:   map[string]error{},
+	}
+
+	got := stripANSI(m.View())
+	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+	if len(lines) == 0 {
+		t.Fatalf("View() retornou vazio")
+	}
+
+	footer := lines[len(lines)-1]
+	for _, want := range []string{"j/k", "enter", "f+s", "f+o", "r", "q"} {
+		if !strings.Contains(footer, want) {
+			t.Fatalf("rodape deveria ficar na ultima linha e conter %q; footer %q; view %q", want, footer, got)
+		}
+	}
+}
+
 func TestCommentsStatusbarShowsAllCurrentScreenBindKeys(t *testing.T) {
 	m := Model{Width: 140}
 	got := stripANSI(m.renderCommentsStatusbar())

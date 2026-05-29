@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
+	xansi "github.com/charmbracelet/x/ansi"
 
 	"paraizofelipe/review-station/internal/gitlab"
 	"paraizofelipe/review-station/internal/ui"
@@ -34,12 +35,12 @@ func (m Model) View() string {
 
 	if m.ShowFilter {
 		filterArea := m.renderFilterOverlay()
-		return header + "\n" + filterArea + statusbar
+		return header + "\n" + filterArea + "\n" + statusbar
 	}
 
 	if m.ShowOwnerFilter {
 		filterArea := m.renderOwnerFilterOverlay()
-		return header + "\n" + filterArea + statusbar
+		return header + "\n" + filterArea + "\n" + statusbar
 	}
 
 	listContent := m.renderList()
@@ -49,6 +50,7 @@ func (m Model) View() string {
 	sb.WriteString(header)
 	sb.WriteString("\n")
 	sb.WriteString(m.Viewport.View())
+	sb.WriteString("\n")
 	sb.WriteString(statusbar)
 
 	return sb.String()
@@ -77,7 +79,9 @@ func (m Model) renderTitleBar() string {
 const keyBarHeight = 1
 
 func (m Model) renderKeyBar(line string) string {
-	return ui.StyleStatusBar.Width(m.Width).Render(line)
+	width := max(m.Width, 1)
+	line = " " + xansi.Truncate(line, max(width-1, 1), "…")
+	return ui.StyleStatusBar.UnsetPadding().Width(width).Render(line)
 }
 
 func (m Model) renderStatusbar() string {
@@ -260,6 +264,7 @@ func (m Model) renderCommentsView() string {
 	sb.WriteString(header)
 	sb.WriteString("\n")
 	sb.WriteString(m.Viewport.View())
+	sb.WriteString("\n")
 	sb.WriteString(statusbar)
 	return sb.String()
 }
