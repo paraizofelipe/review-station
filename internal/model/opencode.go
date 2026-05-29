@@ -68,6 +68,9 @@ func resolveOpenCodeCommand(repo config.Repo, mr *gitlab.MergeRequest, cfg confi
 
 // buildOpenCodeEnv monta as variáveis de ambiente RS_* injetadas no processo.
 func buildOpenCodeEnv(repo config.Repo, mr *gitlab.MergeRequest) map[string]string {
+	if mr == nil {
+		return map[string]string{}
+	}
 	return map[string]string{
 		"RS_MR_IID":           strconv.Itoa(mr.IID),
 		"RS_MR_TITLE":         mr.Title,

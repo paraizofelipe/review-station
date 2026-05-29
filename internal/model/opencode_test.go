@@ -5,6 +5,7 @@ import (
 
 	"paraizofelipe/review-station/internal/config"
 	"paraizofelipe/review-station/internal/gitlab"
+	"paraizofelipe/review-station/internal/launcher"
 )
 
 func TestResolveOpenCodeCommandUsesRepoOverride(t *testing.T) {
@@ -59,19 +60,57 @@ func TestResolveOpenCodeCommandInvalidTemplate(t *testing.T) {
 	}
 }
 
-func TestBuildOpenCodeEnvSetsMRVars(t *testing.T) {
+func TestResolveOpenCodeCommandEmptyWhenNilMR(t *testing.T) {
+	cfg := config.Config{OpenCode: config.OpenCodeConfig{Command: "global {{.IID}}"}}
+	repo := config.Repo{Path: "org/app", Local: "~/projects/app"}
+
+	got, err := resolveOpenCodeCommand(repo, nil, cfg)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if got != "" {
+		t.Errorf("got %q, want vazio quando mr é nil", got)
+	}
+}
+
+func TestResolveOpenCodeCommandExecuteError(t *testing.T) {
+	cfg := config.Config{OpenCode: config.OpenCodeConfig{Command: "{{.UnknownField}}"}}
+	repo := config.Repo{Path: "org/app", Local: "~/projects/app"}
+	mr := &gitlab.MergeRequest{IID: 1}
+
+	if _, err := resolveOpenCodeCommand(repo, mr, cfg); err == nil {
+		t.Fatal("esperava erro de execução do template (campo inexistente)")
+	}
+}
+
+func TestBuildOpenCodeEnvSetsAllVars(t *testing.T) {
 	repo := config.Repo{Path: "org/app", Name: "app", Local: "~/projects/app"}
-	mr := &gitlab.MergeRequest{IID: 7, SourceBranch: "feat", WebURL: "https://x/mr/7"}
-
+	mr := &gitlab.MergeRequest{
+		IID: 7, Title: "T", Description: "D", Author: "ana",
+		SourceBranch: "feat", TargetBranch: "main",
+		WebURL: "https://x/mr/7", State: "opened",
+	}
 	env := buildOpenCodeEnv(repo, mr)
+	want := map[string]string{
+		"RS_MR_IID": "7", "RS_MR_TITLE": "T", "RS_MR_DESCRIPTION": "D",
+		"RS_MR_AUTHOR": "ana", "RS_MR_SOURCE_BRANCH": "feat", "RS_MR_TARGET_BRANCH": "main",
+		"RS_MR_WEB_URL": "https://x/mr/7", "RS_MR_STATE": "opened",
+		"RS_PROJECT_PATH": "org/app", "RS_PROJECT_NAME": "app",
+		"RS_LOCAL": launcher.ExpandHome("~/projects/app"),
+	}
+	for k, v := range want {
+		if env[k] != v {
+			t.Errorf("env[%q] = %q, want %q", k, env[k], v)
+		}
+	}
+}
 
-	if env["RS_MR_IID"] != "7" {
-		t.Errorf("RS_MR_IID = %q, want 7", env["RS_MR_IID"])
+func TestBuildOpenCodeEnvNilMR(t *testing.T) {
+	env := buildOpenCodeEnv(config.Repo{Path: "org/app"}, nil)
+	if env == nil {
+		t.Fatal("esperava map não-nil para mr nil")
 	}
-	if env["RS_MR_SOURCE_BRANCH"] != "feat" {
-		t.Errorf("RS_MR_SOURCE_BRANCH = %q, want feat", env["RS_MR_SOURCE_BRANCH"])
-	}
-	if env["RS_PROJECT_PATH"] != "org/app" {
-		t.Errorf("RS_PROJECT_PATH = %q, want org/app", env["RS_PROJECT_PATH"])
+	if len(env) != 0 {
+		t.Errorf("esperava map vazio para mr nil, got %v", env)
 	}
 }
