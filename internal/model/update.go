@@ -18,8 +18,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Width = msg.Width
 		m.Height = msg.Height
 		headerHeight := 2
-		statusHeight := 1
-		vpHeight := m.Height - headerHeight - statusHeight
+		vpHeight := m.Height - headerHeight - keyBarHeight
 		if vpHeight < 1 {
 			vpHeight = 1
 		}

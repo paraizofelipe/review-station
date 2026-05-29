@@ -74,23 +74,48 @@ func (m Model) renderTitleBar() string {
 	return lipgloss.NewStyle().Width(m.Width).Render(row)
 }
 
+const keyBarHeight = 2
+
+func (m Model) renderKeyBar(lines []string) string {
+	for len(lines) < keyBarHeight {
+		lines = append(lines, "")
+	}
+	if len(lines) > keyBarHeight {
+		lines = lines[:keyBarHeight]
+	}
+	for i, line := range lines {
+		lines[i] = ui.StyleStatusBar.Width(m.Width).Render(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (m Model) renderStatusbar() string {
-	var keys string
 	switch {
 	case m.ShowFilter:
-		keys = "j/k navegar opções  Enter aplicar  Esc fechar"
+		return m.renderKeyBar([]string{
+			"j/k ou ↑/↓ navegar opções  enter aplicar",
+			"esc ou f fechar sem aplicar",
+		})
 	case m.FilterChordPending:
-		keys = "f: [s]tatus  [o]wner  Esc cancelar"
+		return m.renderKeyBar([]string{
+			"f+s ou f+f filtrar status  f+o filtrar owner",
+			"esc cancelar chord de filtro",
+		})
 	case m.ShowOwnerFilter:
-		keys = "Enter confirmar  Esc limpar e fechar"
+		return m.renderKeyBar([]string{
+			"digite owner  enter aplicar filtro",
+			"esc limpar filtro e fechar",
+		})
 	default:
-		base := "j/k navegar  f filtrar  r atualizar  q sair"
+		owner := ""
 		if m.OwnerFilter != "" {
-			base = "j/k navegar  f filtrar  [@" + m.OwnerFilter + "]  r atualizar  q sair"
+			owner = "  filtro atual: @" + m.OwnerFilter
 		}
-		keys = base
+		return m.renderKeyBar([]string{
+			"j/k ou ↑/↓ navegar  enter abrir MR  f+s status  f+o owner" + owner,
+			"r atualizar  q ou ctrl+c sair",
+		})
 	}
-	return ui.StyleStatusBar.Width(m.Width).Render(keys)
 }
 
 func (m Model) renderList() string {
@@ -283,15 +308,16 @@ func (m Model) renderCommentsHeader() string {
 }
 
 func (m Model) renderCommentsStatusbar() string {
-	return ui.StyleStatusBar.Width(m.Width).Render(
-		"j/k scroll  tab/shift+tab comentário  r responder  c colapsar  ctrl+d/u página  backspace voltar  q sair",
-	)
+	return m.renderKeyBar([]string{
+		"j/k ou ↑/↓ scroll  ctrl+d/u página  tab/shift+tab comentário",
+		"r responder  c colapsar  backspace ou esc voltar  q ou ctrl+c sair",
+	})
 }
 
 // replyTextareaHeight returns the inner content line count for the reply
 // textarea, reserving the bottom half of the screen for the markdown preview.
 func replyTextareaHeight(totalH int) int {
-	h := (totalH - 8) / 2
+	h := (totalH - 7 - keyBarHeight) / 2
 	if h < 3 {
 		h = 3
 	}
@@ -301,7 +327,7 @@ func replyTextareaHeight(totalH int) int {
 func (m Model) renderReplyView() string {
 	header := m.renderReplyHeader()
 	statusbar := m.renderReplyStatusbar()
-	previewLines := max(m.Height-8-replyTextareaHeight(m.Height), 2)
+	previewLines := max(m.Height-7-keyBarHeight-replyTextareaHeight(m.Height), 2)
 	divider := ui.StyleSectionDivider.Render("── Preview " + strings.Repeat("─", max(m.Width-12, 4)))
 	var sb strings.Builder
 	sb.WriteString(header)
@@ -360,15 +386,22 @@ func (m Model) renderReplyHeader() string {
 }
 
 func (m Model) renderReplyStatusbar() string {
-	var hint string
 	if m.ReplySending {
-		hint = ui.StyleMeta.Render("[enviando...]")
-	} else if m.ReplyError != nil {
-		hint = ui.StyleError.Render("Erro: " + m.ReplyError.Error())
-	} else {
-		hint = "ctrl+s enviar  esc cancelar"
+		return m.renderKeyBar([]string{
+			ui.StyleMeta.Render("[enviando...]"),
+			"esc cancelar",
+		})
 	}
-	return ui.StyleStatusBar.Width(m.Width).Render(hint)
+	if m.ReplyError != nil {
+		return m.renderKeyBar([]string{
+			ui.StyleError.Render("Erro: " + m.ReplyError.Error()),
+			"ctrl+s tentar enviar novamente  esc cancelar",
+		})
+	}
+	return m.renderKeyBar([]string{
+		"digite/edite resposta no textarea",
+		"ctrl+s enviar  esc cancelar",
+	})
 }
 
 // newReplyInput cria e estiliza o textarea de resposta.
