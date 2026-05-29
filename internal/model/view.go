@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/lipgloss"
-	xansi "github.com/charmbracelet/x/ansi"
 
 	"paraizofelipe/review-station/internal/config"
 	"paraizofelipe/review-station/internal/gitlab"
@@ -106,8 +105,9 @@ func highlightBindKeyTokens(line string) string {
 
 func (m Model) renderKeyBar(line string) string {
 	width := max(m.Width, 1)
-	line = " " + xansi.Truncate(line, max(width-1, 1), "…")
-	line = highlightBindKeyTokens(line)
+	line = highlightBindKeyTokens(" " + line)
+	// Width sem MaxHeight faz o lipgloss quebrar (word-wrap) o conteúdo mais
+	// largo que a largura em múltiplas linhas, em vez de truncar.
 	return ui.StyleStatusBar.UnsetPadding().Width(width).Render(line)
 }
 
@@ -129,7 +129,7 @@ func (m Model) renderStatusbar() string {
 		if m.ProjectFilter != "" {
 			filters += "  projeto:" + projectDisplayNameByPath(m.projectFilterOptions(), m.ProjectFilter)
 		}
-		return m.renderKeyBar("j/k nav enter abrir f+s status f+o owner f+p proj" + filters + " c limpar r recar q/ctrl+c")
+		return m.renderKeyBar("j/k scroll, enter abrir, f+s status, f+o owner, f+p projeto" + filters + " c limpar, r refresh, q/ctrl+c")
 	}
 }
 
@@ -402,7 +402,7 @@ func (m Model) renderCommentsHeader() string {
 }
 
 func (m Model) renderCommentsStatusbar() string {
-	return m.renderKeyBar("j/k ou ↑/↓ scroll  ctrl+d/u página  tab/shift+tab comentário  r responder  c colapsar  backspace ou esc voltar  q ou ctrl+c sair")
+	return m.renderKeyBar("j/k ou ↑/↓ scroll, ctrl+d/u página, tab/shift+tab comentário, r responder, c colapsar, backspace ou esc voltar, q ou ctrl+c sair")
 }
 
 // replyTextareaHeight returns the inner content line count for the reply

@@ -11,17 +11,46 @@ func stripANSI(s string) string {
 	return ansiRe.ReplaceAllString(s, "")
 }
 
-func TestRenderKeyBarAlwaysUsesOneFixedFooterLine(t *testing.T) {
+func TestRenderKeyBarKeepsShortFooterOnOneLine(t *testing.T) {
 	m := Model{Width: 120}
 	got := stripANSI(m.renderKeyBar("j/k navegar  enter abrir  f filtros  r atualizar  q sair"))
 
 	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
 	if len(lines) != 1 {
-		t.Fatalf("renderKeyBar() deve ocupar exatamente 1 linha, got %d: %q", len(lines), got)
+		t.Fatalf("legenda curta deve caber em 1 linha, got %d: %q", len(lines), got)
 	}
 	for _, want := range []string{"j/k navegar", "enter abrir", "f filtros", "r atualizar", "q sair"} {
 		if !strings.Contains(lines[0], want) {
 			t.Errorf("linha unica nao contem %q: %q", want, lines[0])
+		}
+	}
+}
+
+func TestRenderKeyBarWrapsLongFooterWithoutTruncating(t *testing.T) {
+	m := Model{Width: 80}
+	got := stripANSI(strings.TrimRight(m.renderCommentsStatusbar(), "\n"))
+
+	if strings.Contains(got, "…") {
+		t.Fatalf("footer não deveria truncar com reticências em 80 col; got %q", got)
+	}
+	for _, want := range []string{"colapsar", "backspace ou esc voltar", "q ou ctrl+c sair"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("footer deveria mostrar %q por inteiro (sem truncar); got %q", want, got)
+		}
+	}
+}
+
+func TestRenderKeyBarWrapsToTwoLinesWhenItDoesNotFit(t *testing.T) {
+	m := Model{Width: 80}
+	got := stripANSI(strings.TrimRight(m.renderCommentsStatusbar(), "\n"))
+
+	lines := strings.Split(got, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("footer de comentários em 80 col deveria ocupar 2 linhas; got %d: %q", len(lines), lines)
+	}
+	for i, line := range lines {
+		if w := len([]rune(line)); w > 80 {
+			t.Errorf("linha %d excede a largura 80 (%d): %q", i, w, line)
 		}
 	}
 }
@@ -49,7 +78,7 @@ func TestListStatusbarShowsAllCurrentScreenBindKeys(t *testing.T) {
 	}
 }
 
-func TestListViewShowsBindKeyFooterOnItsOwnBottomLine(t *testing.T) {
+func TestListViewClosesWithBindKeyFooter(t *testing.T) {
 	m := Model{
 		Ready:    true,
 		Width:    80,
@@ -59,16 +88,17 @@ func TestListViewShowsBindKeyFooterOnItsOwnBottomLine(t *testing.T) {
 		Errors:   map[string]error{},
 	}
 
-	got := stripANSI(m.View())
-	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
-	if len(lines) == 0 {
-		t.Fatalf("View() retornou vazio")
-	}
+	view := stripANSI(m.View())
+	footer := stripANSI(m.renderStatusbar())
 
-	footer := lines[len(lines)-1]
+	// O rodapé (que pode quebrar em mais de uma linha) deve fechar a view,
+	// abaixo do conteúdo da lista.
+	if !strings.HasSuffix(view, footer) {
+		t.Fatalf("rodape deveria fechar a view; footer %q; view %q", footer, view)
+	}
 	for _, want := range []string{"j/k", "enter", "f+s", "f+o", "f+p", "c", "r", "q"} {
 		if !strings.Contains(footer, want) {
-			t.Fatalf("rodape deveria ficar na ultima linha e conter %q; footer %q; view %q", want, footer, got)
+			t.Errorf("rodape deveria conter %q; footer %q", want, footer)
 		}
 	}
 }

@@ -6,9 +6,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func TestStatusBarHasDedicatedBackgroundColor(t *testing.T) {
-	if StyleStatusBar.GetBackground() != ColorStatusBarBg {
-		t.Fatalf("StyleStatusBar background = %v, want %v", StyleStatusBar.GetBackground(), ColorStatusBarBg)
+func TestStatusBarHasNoBackground(t *testing.T) {
+	// A linha da legenda não deve ter background próprio: ela herda o fundo do
+	// terminal, evitando manchas pretas desencontradas com o resto da tela.
+	if StyleStatusBar.GetBackground() != (lipgloss.NoColor{}) {
+		t.Fatalf("StyleStatusBar não deveria ter background; got %#v", StyleStatusBar.GetBackground())
 	}
 }
 
