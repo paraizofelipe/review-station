@@ -99,6 +99,7 @@ type Model struct {
 	ReplyError          error
 	fetchToken          int64
 	listScrollOffset    int
+	OpenCodeStatus      string
 }
 
 // Bubbletea messages
@@ -132,6 +133,9 @@ type FetchDiffsErrorMsg struct {
 	Token int64
 	Err   error
 }
+
+// OpenCodeLaunchedMsg é emitido após tentar disparar a sessão opencode.
+type OpenCodeLaunchedMsg struct{ Err error }
 
 func New(cfg config.Config, client gitlab.Client) Model {
 	loading := make(map[string]bool, len(cfg.Repos))

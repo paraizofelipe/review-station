@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -9,6 +10,7 @@ import (
 
 	"paraizofelipe/review-station/internal/config"
 	"paraizofelipe/review-station/internal/gitlab"
+	"paraizofelipe/review-station/internal/launcher"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -98,6 +100,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.DiffsLoading = false
 		// Diffs são opcionais: não bloqueia exibição dos comentários.
+		return m, nil
+
+	case OpenCodeLaunchedMsg:
+		if msg.Err != nil {
+			m.OpenCodeStatus = "opencode falhou: " + msg.Err.Error()
+		}
 		return m, nil
 
 	case ReplySuccessMsg:
@@ -201,6 +209,7 @@ func (m Model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CommentCursor = -1
 			m.CommentOffsets = nil
 			m.CollapsedComments = nil
+			m.OpenCodeStatus = ""
 			m.listScrollOffset = m.Viewport.YOffset
 			m.Viewport.YOffset = 0
 			return m, tea.Batch(
@@ -406,6 +415,24 @@ func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case "a":
+		command, err := resolveOpenCodeCommand(m.ActiveRepo, m.ActiveMR, m.Config)
+		if err != nil {
+			m.OpenCodeStatus = "opencode: template inválido"
+			return m, nil
+		}
+		if command == "" {
+			m.OpenCodeStatus = "opencode não configurado"
+			return m, nil
+		}
+		if m.ActiveRepo.Local == "" {
+			m.OpenCodeStatus = "repo sem path local"
+			return m, nil
+		}
+		m.OpenCodeStatus = "opencode iniciado"
+		env := buildOpenCodeEnv(m.ActiveRepo, m.ActiveMR)
+		window := fmt.Sprintf("rs-review-%d", m.ActiveMR.IID)
+		return m, launchOpenCodeCmd(command, m.ActiveRepo.Local, window, env)
 	}
 	var cmd tea.Cmd
 	m.Viewport, cmd = m.Viewport.Update(msg)
@@ -449,6 +476,12 @@ func (m Model) updateReply(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.ReplyInput, cmd = m.ReplyInput.Update(msg)
 	return m, cmd
+}
+
+func launchOpenCodeCmd(command, local, window string, env map[string]string) tea.Cmd {
+	return func() tea.Msg {
+		return OpenCodeLaunchedMsg{Err: launcher.Launch(command, local, window, env)}
+	}
 }
 
 func sendReplyCmd(client gitlab.Client, repo config.Repo, mrIID int, discussionID, body string, token int64) tea.Cmd {
