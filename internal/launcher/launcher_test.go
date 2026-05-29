@@ -78,3 +78,29 @@ func TestBuildInvocationNvimTakesPrecedenceOverTmux(t *testing.T) {
 		t.Errorf("bin = %q, want nvim (NVIM tem precedência sobre TMUX)", bin)
 	}
 }
+
+func TestCommandBuildsShellCmdInLocalDir(t *testing.T) {
+	cmd := Command("opencode run", "/home/u/app", map[string]string{"RS_MR_IID": "9"})
+	if strings.Join(cmd.Args, "\x00") != strings.Join([]string{"sh", "-c", "opencode run"}, "\x00") {
+		t.Errorf("Args = %v, want [sh -c opencode run]", cmd.Args)
+	}
+	if cmd.Dir != "/home/u/app" {
+		t.Errorf("Dir = %q, want /home/u/app", cmd.Dir)
+	}
+	found := false
+	for _, e := range cmd.Env {
+		if e == "RS_MR_IID=9" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Env deveria conter RS_MR_IID=9; got %v", cmd.Env)
+	}
+}
+
+func TestCommandExpandsHomeInDir(t *testing.T) {
+	cmd := Command("x", "~/app", nil)
+	if cmd.Dir != ExpandHome("~/app") {
+		t.Errorf("Dir = %q, want %q", cmd.Dir, ExpandHome("~/app"))
+	}
+}

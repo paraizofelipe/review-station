@@ -66,6 +66,23 @@ func resolveOpenCodeCommand(repo config.Repo, mr *gitlab.MergeRequest, cfg confi
 	return sb.String(), nil
 }
 
+// resolveOpenCodeForBind resolve o comando do opencode e monta as env vars
+// para os binds de opencode. status != "" indica uma mensagem para o rodapé
+// (não há como prosseguir); quando status == "", command/env são válidos.
+func resolveOpenCodeForBind(repo config.Repo, mr *gitlab.MergeRequest, cfg config.Config) (command string, env map[string]string, status string) {
+	c, err := resolveOpenCodeCommand(repo, mr, cfg)
+	if err != nil {
+		return "", nil, "opencode: template inválido"
+	}
+	if c == "" {
+		return "", nil, "opencode não configurado"
+	}
+	if repo.Local == "" {
+		return "", nil, "repo sem path local"
+	}
+	return c, buildOpenCodeEnv(repo, mr), ""
+}
+
 // buildOpenCodeEnv monta as variáveis de ambiente RS_* injetadas no processo.
 func buildOpenCodeEnv(repo config.Repo, mr *gitlab.MergeRequest) map[string]string {
 	if mr == nil {

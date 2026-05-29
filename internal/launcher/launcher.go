@@ -53,6 +53,21 @@ func buildInvocation(det detection, command, local, windowName string) (string, 
 	}
 }
 
+// Command monta um *exec.Cmd que roda o comando (template já resolvido) via
+// shell no diretório local, com as env vars extra anexadas. NÃO inicia o
+// processo — destinado a execução in-place via tea.ExecProcess (takeover da
+// tela), em vez do spawn em janela/terminal externo de Launch.
+func Command(command, local string, extraEnv map[string]string) *exec.Cmd {
+	expanded := ExpandHome(local)
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Dir = expanded
+	cmd.Env = os.Environ()
+	for k, v := range extraEnv {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	return cmd
+}
+
 // Launch resolve o ambiente atual, monta a invocação e dispara o processo de
 // forma fire-and-forget. Retorna erro se o binário do alvo não puder ser
 // iniciado.

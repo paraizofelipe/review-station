@@ -80,3 +80,42 @@ var errFake = fakeErr("falhou")
 type fakeErr string
 
 func (e fakeErr) Error() string { return string(e) }
+
+func keyShiftA() tea.KeyMsg {
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("A")}
+}
+
+func TestUpdateCommentsCapitalAStartsInlineWhenConfigured(t *testing.T) {
+	m := makeTestModel()
+	m.Screen = ScreenComments
+	m.Config = config.Config{OpenCode: config.OpenCodeConfig{Command: "opencode run 'MR {{.IID}}'"}}
+	m.ActiveRepo = config.Repo{Path: "org/app", Name: "app", Local: "~/projects/app"}
+	m.ActiveMR = &gitlab.MergeRequest{IID: 9}
+
+	got, cmd := m.updateComments(keyShiftA())
+	result := got.(Model)
+
+	if cmd == nil {
+		t.Fatal("esperava tea.Cmd (ExecProcess) para o takeover")
+	}
+	if result.OpenCodeStatus != "" {
+		t.Errorf("OpenCodeStatus = %q, want vazio no takeover", result.OpenCodeStatus)
+	}
+}
+
+func TestUpdateCommentsCapitalAWarnsWhenUnconfigured(t *testing.T) {
+	m := makeTestModel()
+	m.Screen = ScreenComments
+	m.ActiveRepo = config.Repo{Path: "org/app", Local: "~/projects/app"}
+	m.ActiveMR = &gitlab.MergeRequest{IID: 9}
+
+	got, cmd := m.updateComments(keyShiftA())
+	result := got.(Model)
+
+	if cmd != nil {
+		t.Error("não deveria disparar cmd sem comando configurado")
+	}
+	if result.OpenCodeStatus != "opencode não configurado" {
+		t.Errorf("OpenCodeStatus = %q, want %q", result.OpenCodeStatus, "opencode não configurado")
+	}
+}

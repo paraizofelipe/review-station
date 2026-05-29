@@ -27,3 +27,14 @@ func TestCommentsStatusbarShowsOpenCodeStatus(t *testing.T) {
 		t.Errorf("keybar deveria mostrar o status do opencode; got %q", got)
 	}
 }
+
+func TestCommentsStatusbarShowsInlineBind(t *testing.T) {
+	m := makeTestModel()
+	m.Width = 200
+
+	got := stripANSI(m.renderCommentsStatusbar())
+
+	if !strings.Contains(got, "A inline") {
+		t.Errorf("keybar deveria conter 'A inline'; got %q", got)
+	}
+}

@@ -416,23 +416,25 @@ func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "a":
-		command, err := resolveOpenCodeCommand(m.ActiveRepo, m.ActiveMR, m.Config)
-		if err != nil {
-			m.OpenCodeStatus = "opencode: template inválido"
-			return m, nil
-		}
-		if command == "" {
-			m.OpenCodeStatus = "opencode não configurado"
-			return m, nil
-		}
-		if m.ActiveRepo.Local == "" {
-			m.OpenCodeStatus = "repo sem path local"
+		command, env, status := resolveOpenCodeForBind(m.ActiveRepo, m.ActiveMR, m.Config)
+		if status != "" {
+			m.OpenCodeStatus = status
 			return m, nil
 		}
 		m.OpenCodeStatus = "opencode iniciado"
-		env := buildOpenCodeEnv(m.ActiveRepo, m.ActiveMR)
 		window := fmt.Sprintf("rs-review-%d", m.ActiveMR.IID)
 		return m, launchOpenCodeCmd(command, m.ActiveRepo.Local, window, env)
+	case "A":
+		command, env, status := resolveOpenCodeForBind(m.ActiveRepo, m.ActiveMR, m.Config)
+		if status != "" {
+			m.OpenCodeStatus = status
+			return m, nil
+		}
+		m.OpenCodeStatus = ""
+		cmd := launcher.Command(command, m.ActiveRepo.Local, env)
+		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+			return OpenCodeLaunchedMsg{Err: err}
+		})
 	}
 	var cmd tea.Cmd
 	m.Viewport, cmd = m.Viewport.Update(msg)
