@@ -40,7 +40,7 @@ func TestRenderKeyBarWrapsLongFooterWithoutTruncating(t *testing.T) {
 	}
 }
 
-func TestRenderKeyBarWrapsToTwoLinesWhenItDoesNotFit(t *testing.T) {
+func TestRenderKeyBarWrapsToThreeLinesWhenItDoesNotFit(t *testing.T) {
 	m := Model{Width: 80}
 	got := stripANSI(strings.TrimRight(m.renderCommentsStatusbar(), "\n"))
 
@@ -107,7 +107,7 @@ func TestCommentsStatusbarShowsAllCurrentScreenBindKeys(t *testing.T) {
 	m := Model{Width: 140}
 	got := stripANSI(m.renderCommentsStatusbar())
 
-	for _, want := range []string{"j/k", "ctrl+d/u", "tab", "shift+tab", "r", "c", "a", "backspace", "esc", "q", "ctrl+c"} {
+	for _, want := range []string{"j/k", "ctrl+d/u", "tab", "shift+tab", "r", "c", "a opencode", "A inline", "backspace", "esc", "q", "ctrl+c"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("renderCommentsStatusbar() deveria conter %q; got %q", want, got)
 		}
