@@ -30,12 +30,9 @@ func TestBuildInvocationNvim(t *testing.T) {
 	if bin != "nvim" {
 		t.Errorf("bin = %q, want nvim", bin)
 	}
-	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, "--server /tmp/nvim.sock") {
-		t.Errorf("args devem conter --server <sock>: %v", args)
-	}
-	if !strings.Contains(joined, "botright vsplit | terminal cd /home/u/app && opencode run") {
-		t.Errorf("args devem abrir terminal no vsplit com o comando: %v", args)
+	want := []string{"--server", "/tmp/nvim.sock", "--remote-send", `<C-\><C-n>:botright vsplit | terminal cd '/home/u/app' && opencode run<CR>`}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Errorf("args = %v, want %v", args, want)
 	}
 }
 
@@ -59,7 +56,16 @@ func TestBuildInvocationGhosttyDefault(t *testing.T) {
 	if bin != "ghostty" {
 		t.Errorf("bin = %q, want ghostty", bin)
 	}
-	want := []string{"-e", "sh", "-c", "cd /home/u/app && opencode run; exec $SHELL"}
+	want := []string{"-e", "sh", "-c", "cd '/home/u/app' && opencode run; exec $SHELL"}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Errorf("args = %v, want %v", args, want)
+	}
+}
+
+func TestBuildInvocationGhosttyQuotesLocalWithSpaces(t *testing.T) {
+	det := detection{}
+	_, args := buildInvocation(det, "opencode run", "/home/u/My Projects/app", "rs-review-1")
+	want := []string{"-e", "sh", "-c", "cd '/home/u/My Projects/app' && opencode run; exec $SHELL"}
 	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
 		t.Errorf("args = %v, want %v", args, want)
 	}

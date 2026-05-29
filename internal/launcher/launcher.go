@@ -27,18 +27,29 @@ func ExpandHome(path string) string {
 	return path
 }
 
+// shellQuote envolve um caminho em aspas simples para embuti-lo com segurança
+// numa string de shell, escapando aspas simples internas.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // buildInvocation monta (binário, args) para o spawn, conforme a detecção do
 // ambiente. Precedência: NVIM > TMUX > ghostty. Função pura: não lê env nem
 // executa nada.
+//
+// Nota: `command` é tratado como fragmento de shell confiável vindo da config
+// do usuário — pode conter aspas e espaços intencionais, portanto não é citado.
+// Apenas `local` (caminho de diretório) é citado via shellQuote.
 func buildInvocation(det detection, command, local, windowName string) (string, []string) {
 	switch {
 	case det.Nvim != "":
-		send := `<C-\><C-n>:botright vsplit | terminal cd ` + local + " && " + command + "<CR>"
+		send := `<C-\><C-n>:botright vsplit | terminal cd ` + shellQuote(local) + " && " + command + "<CR>"
 		return "nvim", []string{"--server", det.Nvim, "--remote-send", send}
 	case det.Tmux != "":
+		// tmux passa local como argumento separado (-c), sem interpolação de shell — seguro.
 		return "tmux", []string{"new-window", "-n", windowName, "-c", local, "sh", "-c", command + "; exec $SHELL"}
 	default:
-		return "ghostty", []string{"-e", "sh", "-c", "cd " + local + " && " + command + "; exec $SHELL"}
+		return "ghostty", []string{"-e", "sh", "-c", "cd " + shellQuote(local) + " && " + command + "; exec $SHELL"}
 	}
 }
 
