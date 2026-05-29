@@ -11,8 +11,9 @@ import (
 var envVarPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
 type Config struct {
-	GitLab GitLabConfig `toml:"gitlab"`
-	Repos  []Repo       `toml:"repo"`
+	GitLab   GitLabConfig   `toml:"gitlab"`
+	OpenCode OpenCodeConfig `toml:"opencode"`
+	Repos    []Repo         `toml:"repo"`
 }
 
 type GitLabConfig struct {
@@ -20,10 +21,15 @@ type GitLabConfig struct {
 	Token   string `toml:"token"`
 }
 
+type OpenCodeConfig struct {
+	Command string `toml:"command"`
+}
+
 type Repo struct {
-	Name  string `toml:"name"`
-	Path  string `toml:"path"`
-	Local string `toml:"local"`
+	Name            string `toml:"name"`
+	Path            string `toml:"path"`
+	Local           string `toml:"local"`
+	OpenCodeCommand string `toml:"opencode_command"`
 }
 
 func DefaultPath() string {
@@ -38,10 +44,12 @@ func Load(path string) (Config, error) {
 	}
 	cfg.GitLab.BaseURL = expandEnv(cfg.GitLab.BaseURL)
 	cfg.GitLab.Token = expandEnv(cfg.GitLab.Token)
+	cfg.OpenCode.Command = expandEnv(cfg.OpenCode.Command)
 	for i := range cfg.Repos {
 		cfg.Repos[i].Name = expandEnv(cfg.Repos[i].Name)
 		cfg.Repos[i].Path = expandEnv(cfg.Repos[i].Path)
 		cfg.Repos[i].Local = expandEnv(cfg.Repos[i].Local)
+		cfg.Repos[i].OpenCodeCommand = expandEnv(cfg.Repos[i].OpenCodeCommand)
 	}
 	return cfg, nil
 }

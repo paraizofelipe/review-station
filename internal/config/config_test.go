@@ -97,3 +97,47 @@ local = "literal-$RS_TEST_HOME"
 		t.Errorf("Repos[1].Local = %q, want %q ($VAR sem chaves deve permanecer literal)", got, want)
 	}
 }
+
+func TestLoadOpenCodeGlobalAndRepoOverride(t *testing.T) {
+	t.Setenv("RS_OC_AGENT", "code-review")
+
+	dir := t.TempDir()
+	content := `
+[gitlab]
+base_url = "https://gitlab.example.com"
+token = "glpat-abc123"
+
+[opencode]
+command = "opencode run --agent ${RS_OC_AGENT} 'MR {{.IID}}'"
+
+[[repo]]
+name = "app"
+path = "org/app"
+local = "~/projects/app"
+
+[[repo]]
+name = "lib"
+path = "org/lib"
+local = "~/projects/lib"
+opencode_command = "opencode run --agent lib-review 'MR {{.IID}}'"
+`
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got, want := cfg.OpenCode.Command, "opencode run --agent code-review 'MR {{.IID}}'"; got != want {
+		t.Errorf("OpenCode.Command = %q, want %q (env deve expandir)", got, want)
+	}
+	if got := cfg.Repos[0].OpenCodeCommand; got != "" {
+		t.Errorf("Repos[0].OpenCodeCommand = %q, want vazio (sem override)", got)
+	}
+	if got, want := cfg.Repos[1].OpenCodeCommand, "opencode run --agent lib-review 'MR {{.IID}}'"; got != want {
+		t.Errorf("Repos[1].OpenCodeCommand = %q, want %q", got, want)
+	}
+}
