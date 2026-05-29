@@ -3,6 +3,8 @@ package model
 import (
 	"strings"
 	"testing"
+
+	"paraizofelipe/review-station/internal/ui"
 )
 
 func stripANSI(s string) string {
@@ -20,6 +22,18 @@ func TestRenderKeyBarAlwaysUsesOneFixedFooterLine(t *testing.T) {
 	for _, want := range []string{"j/k navegar", "enter abrir", "f filtros", "r atualizar", "q sair"} {
 		if !strings.Contains(lines[0], want) {
 			t.Errorf("linha unica nao contem %q: %q", want, lines[0])
+		}
+	}
+}
+
+func TestRenderKeyBarHighlightsBindKeyTokens(t *testing.T) {
+	m := Model{Width: 120}
+	got := m.renderKeyBar("j/k nav enter abrir f+s status r recar q/ctrl+c")
+
+	for _, key := range []string{"j/k", "enter", "f+s", "r", "q/ctrl+c"} {
+		want := ui.StyleBindKey.Render(key)
+		if !strings.Contains(got, want) {
+			t.Fatalf("renderKeyBar() deveria destacar bindkey %q com StyleBindKey; got %q; want substring %q", key, got, want)
 		}
 	}
 }

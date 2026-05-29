@@ -84,9 +84,30 @@ func (m Model) renderTitleBar() string {
 
 const keyBarHeight = 1
 
+var bindKeyTokenPattern = regexp.MustCompile(`(^|\s)(q/ctrl\+c|ctrl\+d/u|shift\+tab|backspace|ctrl\+c|enter|esc|tab|f\+s|f\+f|f\+o|f\+p|j/k|↑/↓|c|r|q|f)(\s|$)`)
+
+func highlightBindKeyTokens(line string) string {
+	matches := bindKeyTokenPattern.FindAllStringSubmatchIndex(line, -1)
+	if len(matches) == 0 {
+		return line
+	}
+
+	var sb strings.Builder
+	last := 0
+	for _, match := range matches {
+		tokenStart, tokenEnd := match[4], match[5]
+		sb.WriteString(line[last:tokenStart])
+		sb.WriteString(ui.StyleBindKey.Render(line[tokenStart:tokenEnd]))
+		last = tokenEnd
+	}
+	sb.WriteString(line[last:])
+	return sb.String()
+}
+
 func (m Model) renderKeyBar(line string) string {
 	width := max(m.Width, 1)
 	line = " " + xansi.Truncate(line, max(width-1, 1), "…")
+	line = highlightBindKeyTokens(line)
 	return ui.StyleStatusBar.UnsetPadding().Width(width).Render(line)
 }
 

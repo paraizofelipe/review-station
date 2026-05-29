@@ -15,6 +15,7 @@ var (
 	ColorBorder      = lipgloss.Color("#504945")
 	ColorSurface     = lipgloss.Color("#3c3836")
 	ColorStatusBarBg = lipgloss.Color("#1d2021") // gruvbox bg0_hard — fundo das legendas de bindkeys
+	ColorBindKeyBg   = lipgloss.Color("#d79921") // gruvbox yellow — destaque das teclas nas legendas
 	ColorBg          = lipgloss.Color("#282828") // gruvbox bg0 — fundo dos comment boxes
 	ColorBg1         = lipgloss.Color("#32302f") // gruvbox bg1 — fundo dos reply boxes
 
@@ -51,6 +52,11 @@ var (
 			Foreground(ColorMuted).
 			Background(ColorStatusBarBg).
 			Padding(0, 1)
+
+	StyleBindKey = lipgloss.NewStyle().
+			Foreground(ColorStatusBarBg).
+			Background(ColorBindKeyBg).
+			Bold(true)
 
 	StylePopoverBorder = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
