@@ -83,7 +83,7 @@ func (m Model) renderTitleBar() string {
 
 const keyBarHeight = 1
 
-var bindKeyTokenPattern = regexp.MustCompile(`(^|\s)(q/ctrl\+c|ctrl\+d/u|shift\+tab|backspace|ctrl\+c|enter|esc|tab|f\+s|f\+f|f\+o|f\+p|j/k|↑/↓|c|r|q|f)(\s|$)`)
+var bindKeyTokenPattern = regexp.MustCompile(`(^|\s)(q/ctrl\+c|ctrl\+d/u|shift\+tab|backspace|ctrl\+c|enter|esc|tab|f\+s|f\+f|f\+o|f\+p|j/k|↑/↓|a|c|r|q|f)(\s|$)`)
 
 func highlightBindKeyTokens(line string) string {
 	matches := bindKeyTokenPattern.FindAllStringSubmatchIndex(line, -1)
@@ -402,7 +402,11 @@ func (m Model) renderCommentsHeader() string {
 }
 
 func (m Model) renderCommentsStatusbar() string {
-	return m.renderKeyBar("j/k ou ↑/↓ scroll, ctrl+d/u página, tab/shift+tab comentário, r responder, c colapsar, backspace ou esc voltar, q ou ctrl+c sair")
+	line := "j/k ou ↑/↓ scroll, ctrl+d/u página, tab/shift+tab comentário, r responder, c colapsar, a opencode, backspace ou esc voltar, q ou ctrl+c sair"
+	if m.OpenCodeStatus != "" {
+		line += "  ·  " + m.OpenCodeStatus
+	}
+	return m.renderKeyBar(line)
 }
 
 // replyTextareaHeight returns the inner content line count for the reply
