@@ -402,7 +402,7 @@ func (m Model) renderCommentsHeader() string {
 }
 
 func (m Model) renderCommentsStatusbar() string {
-	line := "j/k ou ↑/↓ scroll, ctrl+d/u página, tab/shift+tab comentário, r responder, c colapsar, a opencode (janela), A inline, backspace ou esc voltar, q ou ctrl+c sair"
+	line := "j/k ou ↑/↓ scroll, ctrl+d/u página, tab/shift+tab comentário, r responder, c colapsar, a opencode inline, A janela, backspace ou esc voltar, q ou ctrl+c sair"
 	if m.OpenCodeStatus != "" {
 		line += "  ·  " + m.OpenCodeStatus
 	}

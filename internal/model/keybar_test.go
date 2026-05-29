@@ -33,20 +33,20 @@ func TestRenderKeyBarWrapsLongFooterWithoutTruncating(t *testing.T) {
 	if strings.Contains(got, "…") {
 		t.Fatalf("footer não deveria truncar com reticências em 80 col; got %q", got)
 	}
-	for _, want := range []string{"colapsar", "backspace ou esc voltar", "q ou ctrl+c", "sair"} {
+	for _, want := range []string{"colapsar", "backspace ou esc voltar", "q ou ctrl+c sair"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("footer deveria mostrar %q por inteiro (sem truncar); got %q", want, got)
 		}
 	}
 }
 
-func TestRenderKeyBarWrapsToThreeLinesWhenItDoesNotFit(t *testing.T) {
+func TestRenderKeyBarWrapsToTwoLinesWhenItDoesNotFit(t *testing.T) {
 	m := Model{Width: 80}
 	got := stripANSI(strings.TrimRight(m.renderCommentsStatusbar(), "\n"))
 
 	lines := strings.Split(got, "\n")
-	if len(lines) != 3 {
-		t.Fatalf("footer de comentários em 80 col deveria ocupar 3 linhas; got %d: %q", len(lines), lines)
+	if len(lines) != 2 {
+		t.Fatalf("footer de comentários em 80 col deveria ocupar 2 linhas; got %d: %q", len(lines), lines)
 	}
 	for i, line := range lines {
 		if w := len([]rune(line)); w > 80 {
@@ -107,7 +107,7 @@ func TestCommentsStatusbarShowsAllCurrentScreenBindKeys(t *testing.T) {
 	m := Model{Width: 140}
 	got := stripANSI(m.renderCommentsStatusbar())
 
-	for _, want := range []string{"j/k", "ctrl+d/u", "tab", "shift+tab", "r", "c", "a opencode", "A inline", "backspace", "esc", "q", "ctrl+c"} {
+	for _, want := range []string{"j/k", "ctrl+d/u", "tab", "shift+tab", "r", "c", "a opencode inline", "A janela", "backspace", "esc", "q", "ctrl+c"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("renderCommentsStatusbar() deveria conter %q; got %q", want, got)
 		}

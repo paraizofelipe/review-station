@@ -421,20 +421,20 @@ func (m Model) updateComments(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.OpenCodeStatus = status
 			return m, nil
 		}
-		m.OpenCodeStatus = "opencode iniciado"
-		window := fmt.Sprintf("rs-review-%d", m.ActiveMR.IID)
-		return m, launchOpenCodeCmd(command, m.ActiveRepo.Local, window, env)
+		m.OpenCodeStatus = ""
+		cmd := launcher.Command(command, m.ActiveRepo.Local, env)
+		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
+			return OpenCodeLaunchedMsg{Err: err}
+		})
 	case "A":
 		command, env, status := resolveOpenCodeForBind(m.ActiveRepo, m.ActiveMR, m.Config)
 		if status != "" {
 			m.OpenCodeStatus = status
 			return m, nil
 		}
-		m.OpenCodeStatus = ""
-		cmd := launcher.Command(command, m.ActiveRepo.Local, env)
-		return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-			return OpenCodeLaunchedMsg{Err: err}
-		})
+		m.OpenCodeStatus = "opencode iniciado"
+		window := fmt.Sprintf("rs-review-%d", m.ActiveMR.IID)
+		return m, launchOpenCodeCmd(command, m.ActiveRepo.Local, window, env)
 	}
 	var cmd tea.Cmd
 	m.Viewport, cmd = m.Viewport.Update(msg)

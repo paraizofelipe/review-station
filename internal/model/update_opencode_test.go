@@ -13,7 +13,7 @@ func keyA() tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}
 }
 
-func TestUpdateCommentsAStartsOpenCodeWhenConfigured(t *testing.T) {
+func TestUpdateCommentsAStartsInlineWhenConfigured(t *testing.T) {
 	m := makeTestModel()
 	m.Screen = ScreenComments
 	m.Config = config.Config{OpenCode: config.OpenCodeConfig{Command: "opencode run 'MR {{.IID}}'"}}
@@ -24,10 +24,10 @@ func TestUpdateCommentsAStartsOpenCodeWhenConfigured(t *testing.T) {
 	result := got.(Model)
 
 	if cmd == nil {
-		t.Fatal("esperava um tea.Cmd para disparar o opencode")
+		t.Fatal("esperava tea.Cmd (ExecProcess) para o takeover inline")
 	}
-	if result.OpenCodeStatus != "opencode iniciado" {
-		t.Errorf("OpenCodeStatus = %q, want %q", result.OpenCodeStatus, "opencode iniciado")
+	if result.OpenCodeStatus != "" {
+		t.Errorf("OpenCodeStatus = %q, want vazio no takeover inline", result.OpenCodeStatus)
 	}
 }
 
@@ -85,7 +85,7 @@ func keyShiftA() tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("A")}
 }
 
-func TestUpdateCommentsCapitalAStartsInlineWhenConfigured(t *testing.T) {
+func TestUpdateCommentsCapitalAStartsWindowWhenConfigured(t *testing.T) {
 	m := makeTestModel()
 	m.Screen = ScreenComments
 	m.Config = config.Config{OpenCode: config.OpenCodeConfig{Command: "opencode run 'MR {{.IID}}'"}}
@@ -96,10 +96,10 @@ func TestUpdateCommentsCapitalAStartsInlineWhenConfigured(t *testing.T) {
 	result := got.(Model)
 
 	if cmd == nil {
-		t.Fatal("esperava tea.Cmd (ExecProcess) para o takeover")
+		t.Fatal("esperava um tea.Cmd para abrir o opencode em janela externa")
 	}
-	if result.OpenCodeStatus != "" {
-		t.Errorf("OpenCodeStatus = %q, want vazio no takeover", result.OpenCodeStatus)
+	if result.OpenCodeStatus != "opencode iniciado" {
+		t.Errorf("OpenCodeStatus = %q, want %q", result.OpenCodeStatus, "opencode iniciado")
 	}
 }
 

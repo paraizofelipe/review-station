@@ -34,7 +34,18 @@ func TestCommentsStatusbarShowsInlineBind(t *testing.T) {
 
 	got := stripANSI(m.renderCommentsStatusbar())
 
-	if !strings.Contains(got, "A inline") {
-		t.Errorf("keybar deveria conter 'A inline'; got %q", got)
+	if !strings.Contains(got, "a opencode inline") {
+		t.Errorf("keybar deveria conter 'a opencode inline'; got %q", got)
+	}
+}
+
+func TestCommentsStatusbarShowsWindowBind(t *testing.T) {
+	m := makeTestModel()
+	m.Width = 200
+
+	got := stripANSI(m.renderCommentsStatusbar())
+
+	if !strings.Contains(got, "A janela") {
+		t.Errorf("keybar deveria conter 'A janela'; got %q", got)
 	}
 }
